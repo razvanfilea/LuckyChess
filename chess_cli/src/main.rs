@@ -32,7 +32,7 @@ fn handle_cli_command(cmd: &str) -> bool {
         && parts
             .clone()
             .next()
-            .map_or(false, |s| s.eq_ignore_ascii_case("suite"))
+            .is_some_and(|s| s.eq_ignore_ascii_case("suite"))
     {
         let _ = parts.next();
         let depth = parts.next().and_then(|s| s.parse::<u8>().ok());

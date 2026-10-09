@@ -14,87 +14,90 @@ pub use generate::*;
 pub use move_list::*;
 pub use traits::*;
 
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
-enum GenStage {
-    #[default]
-    Init,
-    Captures,
-    Quiets,
-    Evasions,
-    Done,
-}
-
 // Quiets are sorted lazily: most cut nodes use 1–2 quiets
-#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+#[derive(Copy, Clone, PartialEq, Eq, Debug)]
 enum Order {
-    #[default]
     Sorted,
     Unsorted,
     MaxFirst,
 }
 
-pub struct MoveGenerator {
+#[derive(Copy, Clone, PartialEq, Eq, Debug, Default)]
+enum GenStage {
+    #[default]
+    Init,
+    GenerateCaptures,
+    YieldGoodCaptures,
+    GenerateEvasions,
+    // Final list of [bad captures][quiets], sorted lazily
+    YieldRemaining(Order),
+    Done,
+}
+
+pub struct MoveGenerator<const QUIESENCE: bool = false> {
     start_ptr: MoveListPtr,
     end_ptr: MoveListPtr,
     stage: GenStage,
     list_index: usize,
-    quiescence: bool,
+    bad_count: usize,
+
     tt_move: Move,
-    order: Order,
+    killer_moves: KillerMoves,
+    conthist_keys: ContHistKeys,
 }
 
-impl MoveGenerator {
-    pub fn new(move_buffer: MoveListPtr, tt_move: Move) -> Self {
+impl<const QUIESENCE: bool> MoveGenerator<QUIESENCE> {
+    pub fn new(
+        move_buffer: MoveListPtr,
+        tt_move: Move,
+        killer_moves: KillerMoves,
+        conthist_keys: ContHistKeys,
+    ) -> Self {
         Self {
             start_ptr: move_buffer,
             end_ptr: move_buffer,
             stage: GenStage::default(),
             list_index: 0,
-            quiescence: false,
+            bad_count: 0,
             tt_move,
-            order: Order::default(),
+            killer_moves,
+            conthist_keys,
         }
-    }
-
-    pub fn quiescence(move_buffer: MoveListPtr, tt_move: Move) -> Self {
-        let mut move_gen = Self::new(move_buffer, tt_move);
-        move_gen.quiescence = true;
-        move_gen
     }
 
     #[inline(always)]
     pub fn next(
         &mut self,
         board: &Board,
-        killer_moves: KillerMoves,
         history: &HistoryTable,
         cont_history: &ContinuationHistoryTable,
-        conthist_keys: &ContHistKeys,
     ) -> Option<ScoredMove> {
         loop {
             if self.list_index < self.len() {
-                let mov = self.pick_next();
+                let mut mov = self.pick_next();
                 if mov == self.tt_move {
                     continue;
                 }
 
-                // First generate quiets instead of bad captures
-                if self.stage != GenStage::Done && mov.score < 0 {
-                    self.list_index -= 1; // add back the move we were about to return
-                    self.advance_stage(board, killer_moves, history, cont_history, conthist_keys);
-                    continue;
+                if self.stage == GenStage::YieldGoodCaptures {
+                    mov.score = scoring::capture_tier(mov.mov, board, mov.score);
+                    // Defer bad captures to the front: slots before list_index are consumed
+                    if mov.is_bad_capture() {
+                        let index = self.bad_count;
+                        self.as_slice_mut()[index] = mov;
+                        self.bad_count += 1;
+                        continue;
+                    }
                 }
 
                 return Some(mov);
             }
 
-            if self.stage == GenStage::Done {
+            if matches!(self.stage, GenStage::YieldRemaining(_) | GenStage::Done) {
                 return None;
             }
 
-            if let Some(mov) =
-                self.advance_stage(board, killer_moves, history, cont_history, conthist_keys)
-            {
+            if let Some(mov) = self.advance_stage(board, history, cont_history) {
                 return Some(mov);
             }
         }
@@ -123,19 +126,22 @@ impl MoveGenerator {
     #[inline(always)]
     fn pick_next(&mut self) -> ScoredMove {
         let next = self.list_index;
-        self.order = match self.order {
-            Order::Sorted => Order::Sorted,
-            Order::Unsorted => {
-                select_first_max(&mut self.as_slice_mut()[next..]);
-                Order::MaxFirst
-            }
-            Order::MaxFirst => {
-                insertion_sort(&mut self.as_slice_mut()[next..]);
-                Order::Sorted
-            }
-        };
+        if let GenStage::YieldRemaining(order) = self.stage {
+            let order = match order {
+                Order::Sorted => Order::Sorted,
+                Order::Unsorted => {
+                    select_first_max(&mut self.as_slice_mut()[next..]);
+                    Order::MaxFirst
+                }
+                Order::MaxFirst => {
+                    insertion_sort(&mut self.as_slice_mut()[next..]);
+                    Order::Sorted
+                }
+            };
+            self.stage = GenStage::YieldRemaining(order);
+        }
 
-        let mov = unsafe { self.as_slice().get_unchecked(next).clone() };
+        let mov = unsafe { *self.as_slice().get_unchecked(next) };
         self.list_index += 1;
         mov
     }
@@ -144,22 +150,15 @@ impl MoveGenerator {
     fn advance_stage(
         &mut self,
         board: &Board,
-        killer_moves: KillerMoves,
         history: &HistoryTable,
         cont_history: &ContinuationHistoryTable,
-        conthist_keys: &ContHistKeys,
     ) -> Option<ScoredMove> {
-        if self.list_index == self.len() {
-            self.end_ptr = self.start_ptr;
-            self.list_index = 0;
-        }
-
         match self.stage {
             GenStage::Init => {
                 self.stage = if board.checkers != 0 {
-                    GenStage::Evasions
+                    GenStage::GenerateEvasions
                 } else {
-                    GenStage::Captures
+                    GenStage::GenerateCaptures
                 };
 
                 if board.pseudo_legal(self.tt_move) {
@@ -168,7 +167,7 @@ impl MoveGenerator {
                     return Some(mov);
                 }
             }
-            GenStage::Captures => {
+            GenStage::GenerateCaptures => {
                 let ptr = if board.to_play == Color::White {
                     generate_moves::<White, Captures>(board, self.start_ptr)
                 } else {
@@ -182,37 +181,41 @@ impl MoveGenerator {
 
                 insertion_sort(self.as_slice_mut());
 
-                if self.quiescence {
+                self.stage = GenStage::YieldGoodCaptures;
+            }
+            GenStage::YieldGoodCaptures => {
+                // Good captures are exhausted: the list becomes [bad captures][quiets]
+                self.list_index = 0;
+                self.end_ptr = MoveListPtr(unsafe { self.start_ptr.0.add(self.bad_count) });
+
+                // Bad captures were deferred in pick order, so they are already sorted
+                if QUIESENCE {
                     self.stage = GenStage::Done;
                 } else {
-                    self.stage = GenStage::Quiets;
+                    let ptr = if board.to_play == Color::White {
+                        generate_moves::<White, Quiets>(board, self.end_ptr)
+                    } else {
+                        generate_moves::<Black, Quiets>(board, self.end_ptr)
+                    };
+                    self.end_ptr = ptr;
+
+                    let (bad_count, killer_moves, conthist_keys) =
+                        (self.bad_count, self.killer_moves, self.conthist_keys);
+                    for scored_move in &mut self.as_slice_mut()[bad_count..] {
+                        scored_move.score = scoring::score_quiet(
+                            scored_move.mov,
+                            board,
+                            killer_moves,
+                            history,
+                            cont_history,
+                            &conthist_keys,
+                        );
+                    }
+
+                    self.stage = GenStage::YieldRemaining(Order::Unsorted);
                 }
             }
-            GenStage::Quiets => {
-                let remaining_captures = self.len();
-                let ptr = if board.to_play == Color::White {
-                    generate_moves::<White, Quiets>(board, self.end_ptr)
-                } else {
-                    generate_moves::<Black, Quiets>(board, self.end_ptr)
-                };
-                self.end_ptr = ptr;
-
-                for scored_move in &mut self.as_slice_mut()[remaining_captures..] {
-                    scored_move.score = scoring::score_quiet(
-                        scored_move.mov,
-                        board,
-                        killer_moves,
-                        history,
-                        cont_history,
-                        conthist_keys,
-                    );
-                }
-
-                self.order = Order::Unsorted;
-
-                self.stage = GenStage::Done;
-            }
-            GenStage::Evasions => {
+            GenStage::GenerateEvasions => {
                 let ptr = if board.to_play == Color::White {
                     generate_moves::<White, Evasions>(board, self.start_ptr)
                 } else {
@@ -220,10 +223,11 @@ impl MoveGenerator {
                 };
                 self.end_ptr = ptr;
 
+                let (killer_moves, conthist_keys) = (self.killer_moves, self.conthist_keys);
                 for scored_move in self.as_slice_mut() {
                     let mov = scored_move.mov;
                     scored_move.score = if mov.is_tactical() {
-                        scoring::score_capture(mov, board)
+                        scoring::capture_tier(mov, board, scoring::score_capture(mov, board))
                     } else {
                         scoring::score_quiet(
                             mov,
@@ -231,7 +235,7 @@ impl MoveGenerator {
                             killer_moves,
                             history,
                             cont_history,
-                            conthist_keys,
+                            &conthist_keys,
                         )
                     };
                 }
@@ -240,15 +244,13 @@ impl MoveGenerator {
 
                 self.stage = GenStage::Done;
             }
-            GenStage::Done => {}
+            GenStage::YieldRemaining(_) | GenStage::Done => {}
         }
 
         None
     }
 }
 
-/// Moves the first highest-scored move to the front, keeping the others in order,
-/// so the picks match a stable sort.
 fn select_first_max(moves: &mut [ScoredMove]) {
     let mut best = 0;
     for i in 1..moves.len() {

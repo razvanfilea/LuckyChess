@@ -30,32 +30,28 @@ const KILLER_2: i16 = 14_000;
 const BAD_CAPTURES: i16 = -5_000;
 
 #[inline(always)]
-fn mvv_lva(victim: Piece, attacker: Piece) -> i16 {
-    MVV_LVA[victim as usize][attacker as usize]
-}
-
-#[inline(always)]
 pub fn score_capture(mov: Move, board: &Board) -> i16 {
     let attacker = board
         .piece_at(mov.from())
         .map_or(Piece::Pawn, |p| p.piece());
 
-    let victim = if mov.flags() == MoveFlags::EnPassant {
-        Piece::Pawn
-    } else {
-        board.piece_at(mov.to()).map_or(Piece::Pawn, |p| p.piece())
-    };
+    // if no victim, must be en-passant
+    let victim = board.piece_at(mov.to()).map_or(Piece::Pawn, |p| p.piece());
+    let mut score = MVV_LVA[victim as usize][attacker as usize];
 
-    let base_score = mvv_lva(victim, attacker);
-
-    let is_good = (attacker as u8) <= (victim as u8) || see_ge(mov, board, 0);
-    let tier = if is_good { GOOD_CAPTURES } else { BAD_CAPTURES };
-
-    let mut score = tier + base_score;
     if let Some(promo) = mov.promotion_piece() {
         score += MVV_RANK[promo as usize] * 10;
     }
-    score
+
+    let needs_see = (attacker as u8) > (victim as u8);
+    score * 2 + needs_see as i16
+}
+
+#[inline(always)]
+pub fn capture_tier(mov: Move, board: &Board, score: i16) -> i16 {
+    let is_good = score & 1 == 0 || see_ge(mov, board, 0);
+    let tier = if is_good { GOOD_CAPTURES } else { BAD_CAPTURES };
+    tier + (score >> 1)
 }
 
 #[inline(always)]

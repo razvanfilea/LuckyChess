@@ -479,7 +479,10 @@ impl Searcher {
             static_eval.saturating_add(FUTILITY_MARGIN.saturating_mul(depth as i16));
         let orig_alpha = alpha;
         let check_info = self.board.check_info();
-        let mut moves = MoveGenerator::new(move_buffer, tt_move);
+        let killer_moves = self.stack.get_killers(ply);
+        let conthist_keys = self.get_conthist_keys();
+        let mut moves =
+            MoveGenerator::<false>::new(move_buffer, tt_move, killer_moves, conthist_keys);
         let mut legal_moves = 0;
         let mut quiet_moves = 0;
         let mut quiets_tried = QuietsTried::default();
@@ -487,16 +490,8 @@ impl Searcher {
 
         let mut best_score = -INFINITY;
         let mut best_move = Move::NONE;
-        let killer_moves = self.stack.get_killers(ply);
-        let conthist_keys = self.get_conthist_keys();
 
-        while let Some(scored_mov) = moves.next(
-            &self.board,
-            killer_moves,
-            &self.history,
-            &self.cont_history,
-            &conthist_keys,
-        ) {
+        while let Some(scored_mov) = moves.next(&self.board, &self.history, &self.cont_history) {
             if self.stopped {
                 return 0;
             }
@@ -819,18 +814,13 @@ impl Searcher {
         };
 
         let check_info = self.board.check_info();
-        let mut moves = MoveGenerator::quiescence(move_buffer, tt_move);
-        let mut best_move = Move::NONE;
         let killer_moves = self.stack.get_killers(ply);
-
         let no_conthist_keys: ContHistKeys = [None; CONTHIST_LAYERS];
-        while let Some(scored_mov) = moves.next(
-            &self.board,
-            killer_moves,
-            &self.history,
-            &self.cont_history,
-            &no_conthist_keys,
-        ) {
+        let mut moves =
+            MoveGenerator::<true>::new(move_buffer, tt_move, killer_moves, no_conthist_keys);
+        let mut best_move = Move::NONE;
+
+        while let Some(scored_mov) = moves.next(&self.board, &self.history, &self.cont_history) {
             let mov = scored_mov.mov;
             if !in_check && !mov.is_tactical() {
                 continue;
