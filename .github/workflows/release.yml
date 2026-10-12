@@ -7,7 +7,7 @@ on:
   workflow_dispatch:
     inputs:
       tag_name:
-        description: "Release Tag Name"
+        description: "Release Tag Name (leave empty for a pre-release named after the commit)"
         required: false
 
 permissions:
@@ -151,43 +151,9 @@ jobs:
             dist/*
             lucky-chess-macos-aarch64.tar.gz
 
-  build-wasm:
-    name: Build WASM & Web Client
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - name: Install Rust Nightly with wasm target & binaryen
-        run: |
-          sudo apt-get update && sudo apt-get install -y binaryen
-          rustup toolchain install nightly --target wasm32-unknown-unknown
-
-      - name: Compile and Optimize WASM
-        run: |
-          rustup run nightly cargo build-wasm
-          wasm-opt -O3 --all-features \
-            target/wasm32-unknown-unknown/release/lucky_chess.wasm \
-            -o lucky_chess.wasm
-
-          mkdir -p dist_web
-          cp -r chess_web/www/* dist_web/
-          cp lucky_chess.wasm dist_web/
-          zip -r lucky-chess-web-bundle.zip dist_web/
-
-      - name: Upload WASM Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: wasm-binaries
-          path: |
-            lucky_chess.wasm
-            lucky-chess-web-bundle.zip
-
   release:
     name: Publish Release Assets
-    needs: [build-windows, build-linux-x86, build-linux-arm64, build-macos, build-wasm]
+    needs: [build-windows, build-linux-x86, build-linux-arm64, build-macos]
     runs-on: ubuntu-latest
     steps:
       - name: Download all artifacts
@@ -201,13 +167,30 @@ jobs:
         run: |
           sha256sum * > SHA256SUMS.txt || true
 
+      - name: Resolve Release Tag
+        id: tag
+        env:
+          INPUT_TAG: ${{ github.event.inputs.tag_name }}
+        run: |
+          if [ "$GITHUB_REF_TYPE" = "tag" ]; then
+            echo "name=$GITHUB_REF_NAME" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          elif [ -n "$INPUT_TAG" ]; then
+            echo "name=$INPUT_TAG" >> "$GITHUB_OUTPUT"
+            echo "prerelease=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "name=dev-${GITHUB_SHA::7}" >> "$GITHUB_OUTPUT"
+            echo "prerelease=true" >> "$GITHUB_OUTPUT"
+          fi
+
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v3
         with:
-          tag_name: ${{ github.event.inputs.tag_name || github.ref_name }}
-          name: Lucky Chess ${{ github.event.inputs.tag_name || github.ref_name }}
+          tag_name: ${{ steps.tag.outputs.name }}
+          target_commitish: ${{ github.sha }}
+          name: Lucky Chess ${{ steps.tag.outputs.name }}
           draft: false
-          prerelease: false
+          prerelease: ${{ steps.tag.outputs.prerelease }}
           generate_release_notes: true
           files: |
             release-assets/*

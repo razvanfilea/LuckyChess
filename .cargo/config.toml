@@ -4,7 +4,7 @@ rustflags = [
     "-C", "strip=symbols",
     "-C", "panic=abort",
     "-C", "target-feature=+simd128",
-    "-C", "link-arg=-zstack-size=16777216",
+    "-C", "link-arg=-zstack-size=8388608",
 ]
 
 [target.x86_64-pc-windows-msvc]

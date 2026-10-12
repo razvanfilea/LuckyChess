@@ -99,7 +99,7 @@ impl Searcher {
 
     pub fn clear_histories(&mut self) {
         self.history = HistoryTable::default();
-        self.cont_history = ContinuationHistoryTable::default();
+        self.cont_history.clear();
     }
 
     pub fn set_tt(&mut self, tt: Arc<TranspositionTable>) {

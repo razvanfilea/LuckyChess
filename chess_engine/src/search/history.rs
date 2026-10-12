@@ -73,6 +73,14 @@ impl Default for ContinuationHistoryTable {
 }
 
 impl ContinuationHistoryTable {
+    pub fn clear(&mut self) {
+        self.0
+            .as_flattened_mut()
+            .as_flattened_mut()
+            .as_flattened_mut()
+            .fill(0);
+    }
+
     pub fn halve(&mut self) {
         for entry in self
             .0

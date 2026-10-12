@@ -2,13 +2,13 @@
 
 [![Rust](https://img.shields.io/badge/Rust-2024_Edition-orange.svg)](https://www.rust-lang.org/)
 [![License: GPL-3.0](https://img.shields.io/badge/License-GPLv3-blue.svg)](LICENSE.txt)
-[![CI](https://github.com/razvanfilea/ChessEngine/actions/workflows/ci.yml/badge.svg)](https://github.com/razvanfilea/ChessEngine/actions/workflows/ci.yml)
+[![CI](https://github.com/razvanfilea/LuckyChess/actions/workflows/ci.yml/badge.svg)](https://github.com/razvanfilea/LuckyChess/actions/workflows/ci.yml)
 
 A UCI chess engine written in Rust with an embedded NNUE network. Runs natively, in the browser (WASM) and on Android.
 
 ## Downloads
 
-Prebuilt binaries are on the [releases page](https://github.com/razvanfilea/ChessEngine/releases):
+Prebuilt binaries are on the [releases page](https://github.com/razvanfilea/LuckyChess/releases):
 
 - `avx512` / `avx2` — fastest on modern CPUs
 - `sse42` — older CPUs, and AMD Zen 1/2 (the AVX2 builds use PEXT, which is slow on those)
