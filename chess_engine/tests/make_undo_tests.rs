@@ -4,7 +4,7 @@ use chess_engine::move_gen::{Black, Evasions, NonEvasions, White, gen_moves};
 
 fn test_make_undo_for_fen(fen: &str) {
     let board = Board::from_fen(fen).unwrap();
-    let moves = if board.checkers != 0 {
+    let moves = if board.checkers() != 0 {
         if board.to_play == Color::White {
             gen_moves::<White, Evasions>(&board)
         } else {
@@ -25,11 +25,17 @@ fn test_make_undo_for_fen(fen: &str) {
         if !child.legal(mov) {
             continue;
         }
-        let undo = child.make_move(mov, &child.check_info());
-        assert_ne!(child, board, "make_move must change the board: {mov:?}");
-        child.undo_move(mov, undo);
+        let before = (board.to_fen(), board.hash(), board.checkers());
+        child.make_move(mov);
+        assert_ne!(
+            child.hash(),
+            board.hash(),
+            "make_move must change the hash: {mov:?}"
+        );
+        child.undo_move(mov);
         assert_eq!(
-            child, board,
+            (child.to_fen(), child.hash(), child.checkers()),
+            before,
             "undo_move must fully restore the board: {mov:?}"
         );
         tested += 1;

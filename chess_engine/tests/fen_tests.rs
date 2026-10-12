@@ -7,9 +7,9 @@ fn test_start_pos() {
     let board = Board::from_fen(fen).expect("Startpos FEN should be valid");
 
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::ALL);
-    assert_eq!(board.en_passant_target_sq, None);
-    assert_eq!(board.half_move_clock, 0);
+    assert_eq!(board.castling_rights(), CastlingRights::ALL);
+    assert_eq!(board.en_passant_target_sq(), None);
+    assert_eq!(board.half_move_clock(), 0);
     assert_eq!(board.ply, 0);
 
     // Verify pieces on 1st rank
@@ -109,9 +109,9 @@ fn test_missing_trailing_fields() {
     let fen_epd = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR";
     let board = Board::from_fen(fen_epd).expect("Piece placement only should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::empty());
-    assert_eq!(board.en_passant_target_sq, None);
-    assert_eq!(board.half_move_clock, 0);
+    assert_eq!(board.castling_rights(), CastlingRights::empty());
+    assert_eq!(board.en_passant_target_sq(), None);
+    assert_eq!(board.half_move_clock(), 0);
     assert_eq!(board.ply, 0);
     assert_eq!(board.piece_at(Sq::E1).unwrap().piece(), Piece::King);
 
@@ -119,7 +119,7 @@ fn test_missing_trailing_fields() {
     let fen_side = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b";
     let board = Board::from_fen(fen_side).expect("Piece placement + side should parse");
     assert_eq!(board.to_play, Color::Black);
-    assert_eq!(board.castling_rights, CastlingRights::empty());
+    assert_eq!(board.castling_rights(), CastlingRights::empty());
     assert_eq!(board.ply, 1);
 
     // 3. Piece placement + side + castling
@@ -127,15 +127,15 @@ fn test_missing_trailing_fields() {
     let board =
         Board::from_fen(fen_castling).expect("Piece placement + side + castling should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::ALL);
+    assert_eq!(board.castling_rights(), CastlingRights::ALL);
     assert_eq!(board.ply, 0);
 
     // 4. 4 tokens (no halfmove / fullmove)
     let fen_4_tokens = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq -";
     let board = Board::from_fen(fen_4_tokens).expect("4 tokens should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::ALL);
-    assert_eq!(board.half_move_clock, 0);
+    assert_eq!(board.castling_rights(), CastlingRights::ALL);
+    assert_eq!(board.half_move_clock(), 0);
     assert_eq!(board.ply, 0);
 }
 
@@ -144,25 +144,25 @@ fn test_castling_rights_variations() {
     // White kingside only
     let fen = "8/8/8/8/8/8/8/4K2R w K - 0 1";
     let board = Board::from_fen(fen).unwrap();
-    assert_eq!(board.castling_rights, CastlingRights::WHITE_00);
+    assert_eq!(board.castling_rights(), CastlingRights::WHITE_00);
 
     // Black queenside only
     let fen = "r3k3/8/8/8/8/8/8/8 b q - 0 1";
     let board = Board::from_fen(fen).unwrap();
-    assert_eq!(board.castling_rights, CastlingRights::BLACK_000);
+    assert_eq!(board.castling_rights(), CastlingRights::BLACK_000);
 
     // Mixed: White Queenside + Black Kingside
     let fen = "r3k2r/8/8/8/8/8/8/R3K2R w Qk - 0 1";
     let board = Board::from_fen(fen).unwrap();
     assert_eq!(
-        board.castling_rights,
+        board.castling_rights(),
         CastlingRights::WHITE_000 | CastlingRights::BLACK_00
     );
 
     // Explicit dash '-'
     let fen = "8/8/8/8/8/8/8/4K3 w - - 0 1";
     let board = Board::from_fen(fen).unwrap();
-    assert_eq!(board.castling_rights, CastlingRights::empty());
+    assert_eq!(board.castling_rights(), CastlingRights::empty());
 }
 
 #[test]
@@ -170,34 +170,34 @@ fn test_en_passant_squares() {
     // Valid: White to move, Black moved e7-e5 -> target is e6 (White has pawn on d5 able to capture)
     let fen_white = "rnbqkbnr/pppp1ppp/8/3Pp3/8/8/PPP1PPPP/RNBQKBNR w KQkq e6 0 2";
     let board_white = Board::from_fen(fen_white).unwrap();
-    assert_eq!(board_white.en_passant_target_sq, Some(Sq::E6));
+    assert_eq!(board_white.en_passant_target_sq(), Some(Sq::E6));
 
     // Valid: Black to move, White moved e2-e4 -> target is e3 (Black has pawn on d4 able to capture)
     let fen_black = "rnbqkbnr/ppp1pppp/8/8/3pP3/8/PPP2PPP/RNBQKBNR b KQkq e3 0 1";
     let board_black = Board::from_fen(fen_black).unwrap();
-    assert_eq!(board_black.en_passant_target_sq, Some(Sq::E3));
+    assert_eq!(board_black.en_passant_target_sq(), Some(Sq::E3));
 
     // Invalid / Discarded: White to move, target e6 but White has no pawn able to capture
     let fen_no_capturer = "rnbqkbnr/pppp1ppp/8/4p3/4P3/8/PPPP1PPP/RNBQKBNR w KQkq e6 0 2";
     let board_no_capturer = Board::from_fen(fen_no_capturer).unwrap();
-    assert_eq!(board_no_capturer.en_passant_target_sq, None);
+    assert_eq!(board_no_capturer.en_passant_target_sq(), None);
 
     // Invalid: White to move but EP square is rank 3 (illegal rank for White to move)
     let fen_invalid = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq e3 0 1";
     let board_invalid = Board::from_fen(fen_invalid).unwrap();
-    assert_eq!(board_invalid.en_passant_target_sq, None);
+    assert_eq!(board_invalid.en_passant_target_sq(), None);
 
     // Explicit '-'
     let fen_none = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
     let board_none = Board::from_fen(fen_none).unwrap();
-    assert_eq!(board_none.en_passant_target_sq, None);
+    assert_eq!(board_none.en_passant_target_sq(), None);
 }
 
 #[test]
 fn test_move_counters_and_ply() {
     // Move 1 White -> ply 0
     let b1 = Board::from_fen("8/8/8/8/8/8/8/8 w - - 0 1").unwrap();
-    assert_eq!(b1.half_move_clock, 0);
+    assert_eq!(b1.half_move_clock(), 0);
     assert_eq!(b1.ply, 0);
 
     // Move 1 Black -> ply 1
@@ -206,7 +206,7 @@ fn test_move_counters_and_ply() {
 
     // Move 20 White -> ply 38
     let b3 = Board::from_fen("8/8/8/8/8/8/8/8 w - - 12 20").unwrap();
-    assert_eq!(b3.half_move_clock, 12);
+    assert_eq!(b3.half_move_clock(), 12);
     assert_eq!(b3.ply, 38);
 
     // Move 20 Black -> ply 39
@@ -215,7 +215,7 @@ fn test_move_counters_and_ply() {
 
     // High half-move clock (e.g. 75 plies)
     let b5 = Board::from_fen("8/8/8/8/8/8/8/8 w - - 75 50").unwrap();
-    assert_eq!(b5.half_move_clock, 75);
+    assert_eq!(b5.half_move_clock(), 75);
     assert_eq!(b5.ply, 98);
 }
 
@@ -225,7 +225,7 @@ fn test_standard_chess_positions() {
     let kiwipete = "r3k2r/p1ppqpb1/bn2pnp1/3PN3/1p2P3/2N2Q1p/PPPBBPPP/R3K2R w KQkq - 0 1";
     let board = Board::from_fen(kiwipete).expect("Kiwipete should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::ALL);
+    assert_eq!(board.castling_rights(), CastlingRights::ALL);
     assert_eq!(
         board.piece_at(Sq::E5),
         Some(ColoredPiece::new(Piece::Knight, Color::White))
@@ -243,7 +243,7 @@ fn test_standard_chess_positions() {
     let pos3 = "8/2p5/3p4/KP5r/1R3p1k/8/4P1P1/8 w - - 0 1";
     let board = Board::from_fen(pos3).expect("Position 3 should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::empty());
+    assert_eq!(board.castling_rights(), CastlingRights::empty());
     assert_eq!(
         board.piece_at(Sq::A5),
         Some(ColoredPiece::new(Piece::King, Color::White))
@@ -267,7 +267,7 @@ fn test_resilience_and_malformed_fen() {
     let messy_spaces = "  rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR    w   KQkq   -   0   1  ";
     let board = Board::from_fen(messy_spaces).expect("Messy whitespace should parse");
     assert_eq!(board.to_play, Color::White);
-    assert_eq!(board.castling_rights, CastlingRights::ALL);
+    assert_eq!(board.castling_rights(), CastlingRights::ALL);
 
     for bad in [
         "",
@@ -297,23 +297,23 @@ fn test_resilience_and_malformed_fen() {
 #[test]
 fn test_half_move_clock_saturates() {
     let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w - - 300 200").unwrap();
-    assert_eq!(board.half_move_clock, u8::MAX);
+    assert_eq!(board.half_move_clock(), u8::MAX);
 }
 
 #[test]
 fn test_castling_rights_need_king_and_rook() {
     let board = Board::from_fen("4k3/8/8/8/8/8/8/4K3 w KQkq - 0 1").unwrap();
-    assert_eq!(board.castling_rights, CastlingRights::empty());
+    assert_eq!(board.castling_rights(), CastlingRights::empty());
 
     let board = Board::from_fen("r3k3/8/8/8/8/8/8/4K2R w KQkq - 0 1").unwrap();
     assert_eq!(
-        board.castling_rights,
+        board.castling_rights(),
         CastlingRights::WHITE_00 | CastlingRights::BLACK_000
     );
 
     let board = Board::from_fen("r3k2r/8/8/8/8/8/8/R2K3R w KQkq - 0 1").unwrap();
     assert_eq!(
-        board.castling_rights,
+        board.castling_rights(),
         CastlingRights::BLACK_00 | CastlingRights::BLACK_000
     );
 }
@@ -365,7 +365,7 @@ fn test_perft_suite_positions() {
     let board4 = Board::from_fen(pos4).expect("Pos 4 should parse");
     assert_eq!(board4.to_play, Color::White);
     assert_eq!(
-        board4.castling_rights,
+        board4.castling_rights(),
         CastlingRights::BLACK_00 | CastlingRights::BLACK_000
     );
     assert_eq!(
@@ -382,17 +382,17 @@ fn test_perft_suite_positions() {
     let board5 = Board::from_fen(pos5).expect("Pos 5 should parse");
     assert_eq!(board5.to_play, Color::White);
     assert_eq!(
-        board5.castling_rights,
+        board5.castling_rights(),
         CastlingRights::WHITE_00 | CastlingRights::WHITE_000
     );
-    assert_eq!(board5.half_move_clock, 1);
+    assert_eq!(board5.half_move_clock(), 1);
     assert_eq!(board5.ply, 14); // Move 8, White to play -> (8 - 1) * 2 = 14
 
     // Position 6 - Symmetric middlegame
     let pos6 = "r4rk1/1pp1qppp/p1np1n2/2b1p1B1/2B1P1b1/P1NP1N2/1PP1QPPP/R4RK1 w - - 0 10";
     let board6 = Board::from_fen(pos6).expect("Pos 6 should parse");
     assert_eq!(board6.to_play, Color::White);
-    assert_eq!(board6.castling_rights, CastlingRights::empty());
+    assert_eq!(board6.castling_rights(), CastlingRights::empty());
     assert_eq!(board6.ply, 18); // Move 10, White to play -> (10 - 1) * 2 = 18
 }
 
@@ -420,12 +420,12 @@ fn test_all_en_passant_files() {
         );
         let board = Board::from_fen(&fen).unwrap();
         let expected_sq = Sq::new(i as u8, 5); // rank 6 is index 5
-        assert_eq!(board.en_passant_target_sq, expected_sq);
+        assert_eq!(board.en_passant_target_sq(), expected_sq);
 
         // Without attacker, EP square is ignored
         let empty_fen = format!("8/8/8/8/8/8/8/8 w - {f} 0 1");
         assert_eq!(
-            Board::from_fen(&empty_fen).unwrap().en_passant_target_sq,
+            Board::from_fen(&empty_fen).unwrap().en_passant_target_sq(),
             None
         );
     }
@@ -440,12 +440,12 @@ fn test_all_en_passant_files() {
         );
         let board = Board::from_fen(&fen).unwrap();
         let expected_sq = Sq::new(i as u8, 2); // rank 3 is index 2
-        assert_eq!(board.en_passant_target_sq, expected_sq);
+        assert_eq!(board.en_passant_target_sq(), expected_sq);
 
         // Without attacker, EP square is ignored
         let empty_fen = format!("8/8/8/8/8/8/8/8 b - {f} 0 1");
         assert_eq!(
-            Board::from_fen(&empty_fen).unwrap().en_passant_target_sq,
+            Board::from_fen(&empty_fen).unwrap().en_passant_target_sq(),
             None
         );
     }

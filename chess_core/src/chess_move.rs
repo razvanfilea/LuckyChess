@@ -154,6 +154,16 @@ impl MoveFlags {
     }
 
     #[inline(always)]
+    pub const fn castling_king_path(self, color: Color) -> [Sq; 3] {
+        match (color, self) {
+            (Color::White, MoveFlags::CastleKing) => [Sq::E1, Sq::F1, Sq::G1],
+            (Color::White, _) => [Sq::E1, Sq::D1, Sq::C1],
+            (Color::Black, MoveFlags::CastleKing) => [Sq::E8, Sq::F8, Sq::G8],
+            (Color::Black, _) => [Sq::E8, Sq::D8, Sq::C8],
+        }
+    }
+
+    #[inline(always)]
     pub const fn capture_square(self, to: Sq, color: Color) -> Sq {
         match self {
             // SAFETY: An en-passant capture can only land on rank 6 (for White)

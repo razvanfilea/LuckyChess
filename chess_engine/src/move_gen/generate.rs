@@ -18,20 +18,21 @@ pub fn generate_moves<Us: Player, Type: MoveGenType>(
     let king_bb = board.color_piece(Piece::King, us);
     let king_sq = unsafe { bb_lsb(king_bb) };
 
-    if Type::EVASIONS && board.checkers == 0 {
+    if Type::EVASIONS && !board.in_check() {
         return moves;
     }
 
     moves = generate_king_moves::<Us, Type>(board, king_sq, moves);
 
     // Double check: Only king can move
-    if Type::EVASIONS && bb_several(board.checkers) {
+    let checkers = board.checkers();
+    if Type::EVASIONS && bb_several(checkers) {
         return moves;
     }
 
     let target_mask = if Type::EVASIONS {
-        let checker_sq = unsafe { bb_lsb(board.checkers) };
-        board.checkers | bb_between(king_sq, checker_sq)
+        let checker_sq = unsafe { bb_lsb(checkers) };
+        checkers | bb_between(king_sq, checker_sq)
     } else {
         let mut mask = 0;
         if Type::CAPTURES {
@@ -187,7 +188,7 @@ pub fn generate_pawn_moves<Us: Player, Type: MoveGenType>(
             (sh_south_east(pawns), sh_south_west(pawns))
         };
 
-        if let Some(en_passant_sq) = board.en_passant_target_sq {
+        if let Some(en_passant_sq) = board.en_passant_target_sq() {
             let captured_pawn_sq = unsafe { en_passant_sq.shift(backward) };
             let ep_mask = en_passant_sq.bitboard() | captured_pawn_sq.bitboard();
             let en_passant_bb = if ep_mask & target_mask != 0 {
@@ -357,11 +358,12 @@ pub fn generate_castling_moves<Us: Player>(board: &Board, mut moves: MoveListPtr
         )
     };
 
-    if board.castling_rights.contains(ks_right) && (occupied & ks_path) == 0 {
+    let rights = board.castling_rights();
+    if rights.contains(ks_right) && (occupied & ks_path) == 0 {
         moves.push(king_from, ks_to, MoveFlags::CastleKing);
     }
 
-    if board.castling_rights.contains(qs_right) && (occupied & qs_path) == 0 {
+    if rights.contains(qs_right) && (occupied & qs_path) == 0 {
         moves.push(king_from, qs_to, MoveFlags::CastleQueen);
     }
 

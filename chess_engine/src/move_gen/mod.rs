@@ -155,7 +155,7 @@ impl<const QUIESENCE: bool> MoveGenerator<QUIESENCE> {
     ) -> Option<ScoredMove> {
         match self.stage {
             GenStage::Init => {
-                self.stage = if board.checkers != 0 {
+                self.stage = if board.in_check() {
                     GenStage::GenerateEvasions
                 } else {
                     GenStage::GenerateCaptures
@@ -276,9 +276,8 @@ fn insertion_sort(moves: &mut [ScoredMove]) {
 }
 
 pub fn gen_all_moves(board: &Board) -> MoveList {
-    let in_check = board.checkers != 0;
     let mut moves = MoveList::default();
-    let ptr = match (board.to_play, in_check) {
+    let ptr = match (board.to_play, board.in_check()) {
         (Color::White, true) => generate_moves::<White, Evasions>(board, moves.as_ptr()),
         (Color::White, false) => generate_moves::<White, NonEvasions>(board, moves.as_ptr()),
         (Color::Black, true) => generate_moves::<Black, Evasions>(board, moves.as_ptr()),

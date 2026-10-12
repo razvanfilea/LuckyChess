@@ -11,7 +11,7 @@ const MAX_LINE_LEN: usize = 80;
 pub fn san(board: &Board, mov: Move) -> String {
     let mut san = san_without_check(board, mov);
     let mut after = board.clone();
-    after.make_move(mov, &board.check_info());
+    after.make_move(mov);
     if after.in_check() {
         san.push(if legal_moves(&after).is_empty() {
             '#'

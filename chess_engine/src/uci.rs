@@ -32,7 +32,7 @@ impl Default for UciState {
 impl UciState {
     pub fn new(output_cb: impl Fn(String) + Send + Sync + 'static) -> Self {
         let board = Board::start_pos();
-        let game_history = vec![board.hash];
+        let game_history = vec![board.hash()];
         let stop_requested = Arc::<AtomicBool>::default();
         let tt = Arc::new(TranspositionTable::new(64));
         Self {
@@ -122,7 +122,7 @@ uciok"#,
                 self.join_search(true);
                 self.stop_requested.store(false, Ordering::Relaxed);
                 self.board = Board::start_pos();
-                self.game_history = vec![self.board.hash];
+                self.game_history = vec![self.board.hash()];
                 self.tt.clear();
                 if let Some(searcher) = &mut self.searcher {
                     searcher.clear_histories();
@@ -210,22 +210,22 @@ uciok"#,
         };
 
         self.board = board;
-        self.game_history = vec![self.board.hash];
+        self.game_history = vec![self.board.hash()];
 
         for uci_move in tokens {
             let Some(mov) = find_move(&self.board, uci_move) else {
                 eprintln!("Illegal or unrecognized move in position command: {uci_move}");
                 break;
             };
-            self.board.make_move(mov, &self.board.check_info());
-            self.game_history.push(self.board.hash);
+            self.board.play_move(mov);
+            self.game_history.push(self.board.hash());
         }
     }
 
     fn display_board(&self) {
         let mut out = format!("{:?}\n", self.board);
         out.push_str(&format!("FEN: {}\n", self.board.to_fen()));
-        out.push_str(&format!("Key: 0x{:016X}", self.board.hash));
+        out.push_str(&format!("Key: 0x{:016X}", self.board.hash()));
         self.output_line(out);
     }
 
@@ -260,8 +260,8 @@ uciok"#,
             let mut ponder = None;
             if best != Move::NONE {
                 let mut next_board = board;
-                next_board.make_move(best, &next_board.check_info());
-                if let Some(entry) = tt.probe(next_board.hash, 1)
+                next_board.make_move(best);
+                if let Some(entry) = tt.probe(next_board.hash(), 1)
                     && entry.mov != Move::NONE
                     && next_board.legal(entry.mov)
                 {

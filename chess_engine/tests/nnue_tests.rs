@@ -5,7 +5,7 @@ use chess_engine::nnue::{AccumulatorStack, evaluate};
 use chess_engine::search::SearchStack;
 
 fn legal_moves(board: &Board) -> Vec<Move> {
-    let moves = match (board.to_play, board.checkers != 0) {
+    let moves = match (board.to_play, board.checkers() != 0) {
         (Color::White, true) => gen_moves::<White, Evasions>(board),
         (Color::White, false) => gen_moves::<White, NonEvasions>(board),
         (Color::Black, true) => gen_moves::<Black, Evasions>(board),
@@ -29,7 +29,7 @@ struct Walker {
 impl Walker {
     fn check(&mut self, ply: u16) {
         // Evaluate only some nodes so that multi-ply replays are exercised too.
-        if self.board.hash.is_multiple_of(3) {
+        if self.board.hash().is_multiple_of(3) {
             let expected = evaluate(&self.board);
             let got = self.nnue.eval(&self.board, &mut self.stack, ply);
             assert_eq!(got, expected, "eval mismatch at ply {ply}");
@@ -42,19 +42,19 @@ impl Walker {
         if depth == 0 {
             return;
         }
-        let check_info = self.board.check_info();
         for mov in legal_moves(&self.board) {
             let moved_piece = self.board.piece_at(mov.from());
-            let undo = self.board.make_move(mov, &check_info);
-            self.stack[ply + 1].set_move(mov, moved_piece, undo.captured_piece);
+            let captured_piece = self.board.piece_at(mov.capture_square(self.board.to_play));
+            self.board.make_move(mov);
+            self.stack[ply + 1].set_move(mov, moved_piece, captured_piece);
             self.dfs(ply + 1, depth - 1);
-            self.board.undo_move(mov, undo);
+            self.board.undo_move(mov);
         }
-        if self.board.checkers == 0 {
-            let undo = self.board.make_null_move();
+        if self.board.checkers() == 0 {
+            self.board.make_null_move();
             self.stack[ply + 1].set_null_move();
             self.dfs(ply + 1, depth - 1);
-            self.board.undo_null_move(undo);
+            self.board.undo_null_move();
         }
     }
 }

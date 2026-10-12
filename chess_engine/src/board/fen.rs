@@ -2,13 +2,21 @@ use std::str::FromStr;
 
 use chess_core::prelude::*;
 
-use super::Board;
+use super::{Board, BoardState};
 use crate::zobrist::ZOBRIST_KEYS;
 
 pub const START_POS_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 pub fn parse_fen(fen: &str) -> Option<Board> {
-    let mut board = Board::default();
+    let mut board = Board {
+        mailbox: [None; Sq::NB],
+        bit_colors: [0; Color::NB],
+        bit_pieces: [0; Piece::NB],
+        to_play: Color::White,
+        ply: 0,
+        state_index: 0,
+        state_array: std::array::from_fn(|_| BoardState::default()),
+    };
 
     let mut tokens = fen.split_ascii_whitespace();
     let piece_placement = tokens.next()?;
@@ -34,7 +42,7 @@ pub fn parse_fen(fen: &str) -> Option<Board> {
                 file += empty as u8;
             } else {
                 prev_digit = false;
-                board.add_piece(Sq::new(file, rank)?, ColoredPiece::parse(ch)?);
+                board.add_piece::<true>(Sq::new(file, rank)?, ColoredPiece::parse(ch)?);
                 file += 1;
             }
             if file > 8 {
@@ -55,9 +63,10 @@ pub fn parse_fen(fen: &str) -> Option<Board> {
         _ => return None,
     };
 
-    if let Some(castling_rights) = castling.filter(|&c| c != "-") {
-        for ch in castling_rights.chars() {
-            board.castling_rights |= match ch {
+    let mut castling_rights = CastlingRights::empty();
+    if let Some(castling_str) = castling.filter(|&c| c != "-") {
+        for ch in castling_str.chars() {
+            castling_rights |= match ch {
                 'K' => CastlingRights::WHITE_00,
                 'Q' => CastlingRights::WHITE_000,
                 'k' => CastlingRights::BLACK_00,
@@ -77,10 +86,11 @@ pub fn parse_fen(fen: &str) -> Option<Board> {
         if board.piece_at(king) != Some(ColoredPiece::new(Piece::King, color))
             || board.piece_at(rook) != Some(ColoredPiece::new(Piece::Rook, color))
         {
-            board.castling_rights.remove(rights);
+            castling_rights.remove(rights);
         }
     }
 
+    let mut en_passant_target_sq = None;
     if let Some(en_passant_sq) = en_passant.filter(|&e| e != "-") {
         if en_passant_sq.len() != 2 {
             return None;
@@ -91,12 +101,12 @@ pub fn parse_fen(fen: &str) -> Option<Board> {
             let attackers = crate::attacks::pawn_attacks(sq, !board.to_play)
                 & board.color_piece(Piece::Pawn, board.to_play);
             if attackers != 0 {
-                board.en_passant_target_sq = Some(sq);
+                en_passant_target_sq = Some(sq);
             }
         }
     }
 
-    board.half_move_clock = match half_move {
+    let half_move_clock = match half_move {
         Some(val) => val.parse::<u32>().ok()?.min(u8::MAX.into()) as u8,
         None => 0,
     };
@@ -107,15 +117,22 @@ pub fn parse_fen(fen: &str) -> Option<Board> {
     };
     board.ply = (counter.saturating_sub(1)) * 2 + if board.to_play == Color::Black { 1 } else { 0 };
 
-    if board.to_play == Color::White {
-        board.hash ^= ZOBRIST_KEYS.side();
+    let to_play = board.to_play;
+    let state = board.state_mut();
+    state.castling_rights = castling_rights;
+    state.en_passant_target_sq = en_passant_target_sq;
+    state.half_move_clock = half_move_clock;
+
+    // Piece keys were already added by add_piece
+    if to_play == Color::White {
+        state.hash ^= ZOBRIST_KEYS.side();
     }
-    board.hash ^= ZOBRIST_KEYS.castling(board.castling_rights);
-    if let Some(ep_sq) = board.en_passant_target_sq {
-        board.hash ^= ZOBRIST_KEYS.en_passant(ep_sq);
+    state.hash ^= ZOBRIST_KEYS.castling(castling_rights);
+    if let Some(ep_sq) = en_passant_target_sq {
+        state.hash ^= ZOBRIST_KEYS.en_passant(ep_sq);
     }
 
-    if board.color_piece(Piece::King, board.to_play) != 0 {
+    if board.color_piece(Piece::King, to_play) != 0 {
         board.set_checkers();
         board.set_pinned();
     }
@@ -159,20 +176,21 @@ pub fn format_fen(board: &Board) -> String {
 
     // 3. Castling availability
     fen.push(' ');
+    let state = board.state();
     let mut any_castling = false;
-    if board.castling_rights.contains(CastlingRights::WHITE_00) {
+    if state.castling_rights.contains(CastlingRights::WHITE_00) {
         fen.push('K');
         any_castling = true;
     }
-    if board.castling_rights.contains(CastlingRights::WHITE_000) {
+    if state.castling_rights.contains(CastlingRights::WHITE_000) {
         fen.push('Q');
         any_castling = true;
     }
-    if board.castling_rights.contains(CastlingRights::BLACK_00) {
+    if state.castling_rights.contains(CastlingRights::BLACK_00) {
         fen.push('k');
         any_castling = true;
     }
-    if board.castling_rights.contains(CastlingRights::BLACK_000) {
+    if state.castling_rights.contains(CastlingRights::BLACK_000) {
         fen.push('q');
         any_castling = true;
     }
@@ -182,7 +200,7 @@ pub fn format_fen(board: &Board) -> String {
 
     // 4. En passant target square
     fen.push(' ');
-    if let Some(sq) = board.en_passant_target_sq {
+    if let Some(sq) = state.en_passant_target_sq {
         fen.push_str(&sq.to_string());
     } else {
         fen.push('-');
@@ -190,7 +208,7 @@ pub fn format_fen(board: &Board) -> String {
 
     // 5. Halfmove clock
     fen.push(' ');
-    fen.push_str(&board.half_move_clock.to_string());
+    fen.push_str(&state.half_move_clock.to_string());
 
     // 6. Fullmove counter
     fen.push(' ');

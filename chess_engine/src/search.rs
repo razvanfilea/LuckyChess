@@ -83,7 +83,7 @@ impl Searcher {
         self.history.halve();
         self.cont_history.halve();
         self.stack = SearchStack::default();
-        self.stack[0].hash = board.hash;
+        self.stack[0].hash = board.hash();
         self.stack[0].acc_computed = [true; Color::NB];
         self.nnue.reset(&board);
         self.root_ply = board.ply;
@@ -218,7 +218,7 @@ impl Searcher {
     #[inline(always)]
     fn is_repetition(&self) -> bool {
         let ply = self.ply();
-        let rule50 = self.board.half_move_clock as usize;
+        let rule50 = self.board.half_move_clock() as usize;
         let root_idx = self.history_keys.len().saturating_sub(1);
         let total_history = (ply as usize) + root_idx;
         let limit = rule50.min(total_history);
@@ -227,7 +227,7 @@ impl Searcher {
             return false;
         }
 
-        let current_hash = self.board.hash;
+        let current_hash = self.board.hash();
         let mut counter = 0;
         for i in (4..=limit).step_by(2) {
             let prev_hash = if (i as u16) <= ply {
@@ -255,7 +255,7 @@ impl Searcher {
 
     #[inline(always)]
     fn is_draw(&self) -> bool {
-        if self.board.half_move_clock >= 100 || self.is_repetition() {
+        if self.board.half_move_clock() >= 100 || self.is_repetition() {
             return true;
         }
 
@@ -303,7 +303,7 @@ impl Searcher {
             return;
         }
         let entry = TTEntry::new(mov, score, eval, depth, flag, pv);
-        self.tt.store(self.board.hash, entry, self.ply());
+        self.tt.store(self.board.hash(), entry, self.ply());
     }
 
     #[inline(always)]
@@ -324,6 +324,22 @@ impl Searcher {
     fn get_lmr(&self, is_pv: bool, depth: u8, mov_index: u8) -> u8 {
         let (non_pv, pv) = self.lmr_table[depth.min(63) as usize][mov_index.min(63) as usize];
         if is_pv { pv } else { non_pv }
+    }
+
+    /// Makes the move and records it on the stack for the child node
+    #[inline(always)]
+    fn make_child_move(&mut self, mov: Move, gives_check: bool, ply: u16) -> Option<ColoredPiece> {
+        let us = self.board.to_play;
+        let moved_piece = self.board.piece_at(mov.from());
+        let captured_piece = self.board.piece_at(mov.capture_square(us));
+        self.board.make_move_fast(mov, gives_check);
+
+        let hash = self.board.hash();
+        self.tt.prefetch(hash);
+        let child = &mut self.stack[ply + 1];
+        child.set_move(mov, moved_piece, captured_piece);
+        child.hash = hash;
+        moved_piece
     }
 
     #[inline(always)]
@@ -365,7 +381,7 @@ impl Searcher {
         }
 
         let tt_entry = if excluded.is_none() {
-            self.tt.probe(self.board.hash, ply)
+            self.tt.probe(self.board.hash(), ply)
         } else {
             None
         };
@@ -443,10 +459,11 @@ impl Searcher {
                 && beta < MATE_THRESHOLD
                 && has_non_pawn
             {
-                let undo = self.board.make_null_move();
-                self.tt.prefetch(self.board.hash);
+                self.board.make_null_move();
+                let hash = self.board.hash();
+                self.tt.prefetch(hash);
                 self.stack[ply + 1].set_null_move();
-                self.stack[ply + 1].hash = self.board.hash;
+                self.stack[ply + 1].hash = hash;
 
                 let eval_margin = (static_eval - beta).max(0);
                 let eval_bonus =
@@ -461,7 +478,7 @@ impl Searcher {
                     false,
                     !cut_node,
                 );
-                self.board.undo_null_move(undo);
+                self.board.undo_null_move();
 
                 if self.stopped {
                     return 0;
@@ -478,7 +495,6 @@ impl Searcher {
         let futility_margin_eval =
             static_eval.saturating_add(FUTILITY_MARGIN.saturating_mul(depth as i16));
         let orig_alpha = alpha;
-        let check_info = self.board.check_info();
         let killer_moves = self.stack.get_killers(ply);
         let conthist_keys = self.get_conthist_keys();
         let mut moves =
@@ -518,7 +534,7 @@ impl Searcher {
                 continue;
             }
 
-            let move_gives_check = self.board.gives_check(mov, &check_info);
+            let move_gives_check = self.board.gives_check(mov);
 
             if skip_quiets && !mov.is_tactical() && !move_gives_check {
                 continue;
@@ -622,13 +638,8 @@ impl Searcher {
                 }
             }
 
-            let moved_piece = self.board.piece_at(mov.from());
             let us = self.board.to_play;
-            let undo = self.board.make_move_fast(mov, move_gives_check);
-            self.tt.prefetch(self.board.hash);
-            let child_ply = ply + 1;
-            self.stack[child_ply].set_move(mov, moved_piece, undo.captured_piece);
-            self.stack[child_ply].hash = self.board.hash;
+            let moved_piece = self.make_child_move(mov, move_gives_check, ply);
 
             // --- Search the Move ---
             let mut score = -INFINITY;
@@ -699,7 +710,7 @@ impl Searcher {
                     !IS_PV && !cut_node,
                 );
             }
-            self.board.undo_move(mov, undo);
+            self.board.undo_move(mov);
 
             if self.stopped {
                 return 0;
@@ -722,7 +733,14 @@ impl Searcher {
                     self.update_quiet_history(mov, quiets_tried.as_slice(), &conthist_keys, depth);
                 }
 
-                self.store_tt(mov, best_score, static_eval, depth, TTFlag::LowerBound, tt_pv);
+                self.store_tt(
+                    mov,
+                    best_score,
+                    static_eval,
+                    depth,
+                    TTFlag::LowerBound,
+                    tt_pv,
+                );
                 return best_score;
             }
 
@@ -771,7 +789,7 @@ impl Searcher {
         }
 
         // qsearch has no PV nodes of its own; it only carries the stored bit forward
-        let (tt_move, mut static_eval, tt_pv) = match self.tt.probe(self.board.hash, ply) {
+        let (tt_move, mut static_eval, tt_pv) = match self.tt.probe(self.board.hash(), ply) {
             Some(entry) => {
                 if let Some(score) = entry.cutoff(0, alpha, beta) {
                     return score;
@@ -791,7 +809,14 @@ impl Searcher {
                 static_eval = self.eval_position();
             }
             if static_eval >= beta {
-                self.store_tt(Move::NONE, static_eval, static_eval, 0, TTFlag::LowerBound, tt_pv);
+                self.store_tt(
+                    Move::NONE,
+                    static_eval,
+                    static_eval,
+                    0,
+                    TTFlag::LowerBound,
+                    tt_pv,
+                );
                 return static_eval;
             }
             if static_eval > alpha {
@@ -811,7 +836,6 @@ impl Searcher {
             static_eval
         };
 
-        let check_info = self.board.check_info();
         let killer_moves = self.stack.get_killers(ply);
         let no_conthist_keys: ContHistKeys = [None; CONTHIST_LAYERS];
         let mut moves =
@@ -855,15 +879,10 @@ impl Searcher {
                 continue;
             }
 
-            let moved_piece = self.board.piece_at(mov.from());
-            let undo = self.board.make_move(mov, &check_info);
-            self.tt.prefetch(self.board.hash);
-            let child_ply = ply + 1;
-            self.stack[child_ply].set_move(mov, moved_piece, undo.captured_piece);
-            self.stack[child_ply].hash = self.board.hash;
+            self.make_child_move(mov, self.board.gives_check(mov), ply);
 
             let score = -self.qsearch(moves.next_ptr(), -beta, -alpha);
-            self.board.undo_move(mov, undo);
+            self.board.undo_move(mov);
 
             if self.stopped {
                 return 0;
@@ -884,7 +903,14 @@ impl Searcher {
         }
 
         if best_score <= orig_alpha {
-            self.store_tt(Move::NONE, best_score, static_eval, 0, TTFlag::UpperBound, tt_pv);
+            self.store_tt(
+                Move::NONE,
+                best_score,
+                static_eval,
+                0,
+                TTFlag::UpperBound,
+                tt_pv,
+            );
         } else if in_check {
             // We can only store as exact if in check, otherwise we didnt even check all moves
             self.store_tt(best_move, best_score, static_eval, 0, TTFlag::Exact, tt_pv);
@@ -924,7 +950,7 @@ impl Searcher {
 
         let tt_move = self
             .tt
-            .probe(self.board.hash, 0)
+            .probe(self.board.hash(), 0)
             .map_or(Move::NONE, |e| e.mov);
         if tt_move != Move::NONE && self.board.legal(tt_move) {
             return tt_move;

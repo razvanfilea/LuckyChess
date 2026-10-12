@@ -5,6 +5,7 @@ use chess_core::prelude::*;
 pub const MAX_MOVES: usize = 256;
 
 #[derive(Clone, Copy, Debug, PartialEq, Default)]
+#[repr(C, align(4))]
 pub struct ScoredMove {
     pub mov: Move,
     pub score: i16,

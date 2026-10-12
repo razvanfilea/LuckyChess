@@ -38,7 +38,7 @@ pub fn is_valid_position(board: &Board) -> bool {
 }
 
 fn is_valid_en_passant(board: &Board) -> bool {
-    let Some(ep) = board.en_passant_target_sq else {
+    let Some(ep) = board.en_passant_target_sq() else {
         return true;
     };
     let (ep_rank, pawn_rank, origin_rank) = match board.to_play {
@@ -68,7 +68,10 @@ pub fn legal_moves(board: &Board) -> Vec<Move> {
 pub fn calculate_game_state(board: &Board, history_hashes: &[u64]) -> GameState {
     let has_moves = !legal_moves(board).is_empty();
     let is_mate = !has_moves && board.in_check();
-    let repetitions = history_hashes.iter().filter(|&&h| h == board.hash).count();
+    let repetitions = history_hashes
+        .iter()
+        .filter(|&&h| h == board.hash())
+        .count();
     if !is_mate && (board.is_draw() || repetitions >= 2) {
         return GameState::Draw;
     }

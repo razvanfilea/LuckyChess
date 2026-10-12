@@ -1,9 +1,5 @@
 use chess_core::prelude::*;
-use chess_engine::{
-    board::{Board, UndoInfo},
-    nnue::evaluate,
-    search::piece_value,
-};
+use chess_engine::{board::Board, nnue::evaluate, search::piece_value};
 
 use crate::{
     notation,
@@ -30,7 +26,7 @@ pub struct BoardSnapshot {
 struct Entry {
     mov: Move,
     san: String,
-    undo_info: UndoInfo,
+    board_before: Board,
 }
 
 pub struct ChessGame {
@@ -94,13 +90,13 @@ impl ChessGame {
     pub fn position_keys(&self) -> Vec<u64> {
         self.history
             .iter()
-            .map(|entry| entry.undo_info.hash)
-            .chain([self.board.hash])
+            .map(|entry| entry.board_before.hash())
+            .chain([self.board.hash()])
             .collect()
     }
 
     pub fn game_state(&self) -> GameState {
-        let history_hashes: Vec<u64> = self.history.iter().map(|e| e.undo_info.hash).collect();
+        let history_hashes: Vec<u64> = self.history.iter().map(|e| e.board_before.hash()).collect();
         rules::calculate_game_state(&self.board, &history_hashes)
     }
 
@@ -110,12 +106,12 @@ impl ChessGame {
         }
 
         let san = notation::san(&self.board, mov);
-        let check_info = self.board.check_info();
-        let undo_info = self.board.make_move(mov, &check_info);
+        let board_before = self.board.clone();
+        self.board.play_move(mov);
         self.history.push(Entry {
             mov,
             san,
-            undo_info,
+            board_before,
         });
         self.version += 1;
         true
@@ -136,7 +132,7 @@ impl ChessGame {
         let Some(entry) = self.history.pop() else {
             return false;
         };
-        self.board.undo_move(entry.mov, entry.undo_info.clone());
+        self.board = entry.board_before.clone();
         self.redo.push(entry);
         self.version += 1;
         true
