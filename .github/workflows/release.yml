@@ -26,10 +26,13 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
 
-      - name: Compile Windows Binaries (AVX2, AVX-512)
+      - name: Compile Windows Binaries (SSE4.2, AVX2, AVX-512)
         shell: bash
         run: |
           mkdir -p dist
+
+          RUSTFLAGS="-C target-cpu=x86-64-v2 -C target-feature=+crt-static" cargo build --release --bin lucky_chess
+          cp target/release/lucky_chess.exe dist/lucky-chess-windows-x86_64-sse42.exe
 
           RUSTFLAGS="-C target-cpu=x86-64-v3 -C target-feature=+crt-static" cargo build --release --bin lucky_chess
           cp target/release/lucky_chess.exe dist/lucky-chess-windows-x86_64-avx2.exe
@@ -66,6 +69,10 @@ jobs:
         run: |
           mkdir -p dist
 
+          RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-musl --bin lucky_chess
+          strip target/x86_64-unknown-linux-musl/release/lucky_chess
+          cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-sse42
+
           RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release --target x86_64-unknown-linux-musl --bin lucky_chess
           strip target/x86_64-unknown-linux-musl/release/lucky_chess
           cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-avx2
@@ -74,7 +81,7 @@ jobs:
           strip target/x86_64-unknown-linux-musl/release/lucky_chess
           cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-avx512
 
-          tar -czf lucky-chess-linux-x86_64-musl.tar.gz -C dist . LICENSE.txt
+          tar -czf lucky-chess-linux-x86_64-musl.tar.gz -C dist . -C .. LICENSE.txt
 
       - name: Upload Linux x86 Artifact
         uses: actions/upload-artifact@v7
@@ -106,7 +113,7 @@ jobs:
           cargo build --release --target aarch64-unknown-linux-gnu --bin lucky_chess
           aarch64-linux-gnu-strip target/aarch64-unknown-linux-gnu/release/lucky_chess
           cp target/aarch64-unknown-linux-gnu/release/lucky_chess dist/lucky-chess-linux-aarch64
-          tar -czf lucky-chess-linux-aarch64.tar.gz -C dist . LICENSE.txt
+          tar -czf lucky-chess-linux-aarch64.tar.gz -C dist . -C .. LICENSE.txt
 
       - name: Upload Linux ARM64 Artifact
         uses: actions/upload-artifact@v7
@@ -134,7 +141,7 @@ jobs:
           cargo build --release --bin lucky_chess
           strip target/release/lucky_chess
           cp target/release/lucky_chess dist/lucky-chess-macos-aarch64
-          tar -czf lucky-chess-macos-aarch64.tar.gz -C dist . LICENSE.txt
+          tar -czf lucky-chess-macos-aarch64.tar.gz -C dist . -C .. LICENSE.txt
 
       - name: Upload macOS Artifact
         uses: actions/upload-artifact@v7
