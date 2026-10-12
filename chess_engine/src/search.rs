@@ -613,6 +613,9 @@ impl Searcher {
 
                 if singular_score < singular_beta {
                     extension = 1;
+                    if !IS_PV && singular_score < singular_beta - SE_DOUBLE_MARGIN {
+                        extension = 2 + (singular_score < singular_beta - SE_TRIPLE_MARGIN) as i16;
+                    }
                 } else if singular_score >= beta && singular_score.abs() < MATE_THRESHOLD {
                     return singular_score;
                 }

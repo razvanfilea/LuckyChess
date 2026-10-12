@@ -58,6 +58,9 @@ pub(super) const LMR_MIN_LEGAL_MOVES: usize = 1;
 pub(super) const LMR_HISTORY_DIVISOR: i32 = 12000;
 
 pub(super) const DELTA_MARGIN: i16 = 2 * piece_value(Piece::Pawn);
+
+pub(super) const SE_DOUBLE_MARGIN: i16 = 8;
+pub(super) const SE_TRIPLE_MARGIN: i16 = 76;
 pub(super) const GLOBAL_DELTA_MARGIN: i16 = piece_value(Piece::Queen);
 
 pub(super) const ASPIRATION_INITIAL_DELTA: i16 = 100;
