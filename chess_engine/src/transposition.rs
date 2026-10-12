@@ -282,10 +282,12 @@ impl TranspositionTable {
             entry.eval = victim_entry.eval;
         }
 
-        // Avoid overwriting a deep entry from the current generation with a shallow bound
+        // Avoid overwriting a deep entry from the current generation with a shallow bound,
+        // giving PV entries two extra plies of slack
         if same_pos {
             let is_current_search = victim_entry.age() == self.age();
-            if is_current_search && (entry.depth as i16) + 3 < (victim_entry.depth as i16) {
+            let depth = entry.depth as i16 + 3 + 2 * entry.is_pv() as i16;
+            if is_current_search && depth < (victim_entry.depth as i16) {
                 // If we found a move where none was recorded, update only the move
                 if victim_entry.mov.is_none() && !entry.mov.is_none() {
                     let mut updated = victim_entry;

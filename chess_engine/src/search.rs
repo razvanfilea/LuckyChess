@@ -594,7 +594,8 @@ impl Searcher {
             {
                 self.stack[ply].excluded = tt_move;
                 let tt_score = entry.value;
-                let singular_beta = tt_score - (depth as i16 * 8);
+                let singular_beta =
+                    tt_score - (depth as i16 * 8) - depth as i16 * (tt_pv && !IS_PV) as i16;
                 let singular_depth = (depth - 1) / 2;
 
                 let singular_score = self.nega_max::<false>(
@@ -619,12 +620,6 @@ impl Searcher {
                 } else if singular_score >= beta && singular_score.abs() < MATE_THRESHOLD {
                     return singular_score;
                 }
-                // Stage 2 (negative extensions), disabled while testing stage 1:
-                // } else if tt_score >= beta {
-                //     extension = -2;
-                // } else if cut_node {
-                //     extension = -2;
-                // }
             }
 
             let moved_piece = self.board.piece_at(mov.from());
