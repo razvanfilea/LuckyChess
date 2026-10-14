@@ -1,13 +1,12 @@
 #![cfg(not(miri))]
 
+use crate::common::START_FEN;
 use chess_core::prelude::*;
 use chess_engine::board::Board;
 use chess_engine::time::{SearchOptions, TimeManager};
 use chess_engine::uci::{UciState, format_move, parse_go};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
-
-const START_FEN: &str = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1";
 
 fn go_startpos(args: &str) -> SearchOptions {
     parse_go(args, &Board::start_pos())
