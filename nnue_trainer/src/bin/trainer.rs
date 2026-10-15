@@ -22,7 +22,7 @@ const DATA_PATHS: &[&str] = &[
     "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-12.bullet.bin",
 ];
 
-const SUPERBATCHES: usize = 200;
+const SUPERBATCHES: usize = 480;
 
 fn main() {
     let mut trainer = build_trainer();
@@ -61,7 +61,7 @@ fn main() {
             final_lr: 0.001 * 0.3f32.powi(5),
             final_superbatch: SUPERBATCHES,
         },
-        save_rate: SUPERBATCHES / 10,
+        save_rate: 30,
     };
 
     let settings = LocalSettings {
