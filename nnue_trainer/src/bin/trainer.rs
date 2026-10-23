@@ -22,7 +22,7 @@ const DATA_PATHS: &[&str] = &[
     "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-12.bullet.bin",
 ];
 
-const SUPERBATCHES: usize = 480;
+const SUPERBATCHES: usize = 220;
 
 fn main() {
     let mut trainer = build_trainer();
@@ -44,7 +44,7 @@ fn main() {
     };
 
     let schedule = TrainingSchedule {
-        net_id: "lucky-v5".to_string(),
+        net_id: "lucky-v6".to_string(),
         eval_scale: SCALE as f32,
         steps: TrainingSteps {
             batch_size: 16_384,

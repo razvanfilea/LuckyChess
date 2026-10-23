@@ -1,7 +1,7 @@
 use chess_engine::{board::Board, nnue::evaluate};
 use nnue_trainer::{SCALE, build_trainer};
 
-const CHECKPOINT: &str = "checkpoints/lucky-v5-480";
+const CHECKPOINT: &str = "checkpoints/lucky-v6-220";
 const TOLERANCE: f32 = 40.0;
 
 const FENS: &[&str] = &[
@@ -78,9 +78,9 @@ fn main() {
     );
 
     if fails > 0 {
-        eprintln!("PARITY FAILED — layout / quantisation / bucket bug likely.");
+        eprintln!("PARITY FAILED");
         std::process::exit(1);
     }
 
-    println!("PARITY OK — engine eval matches the bullet checkpoint.");
+    println!("PARITY OK");
 }

@@ -6,7 +6,7 @@ use chess_core::prelude::*;
 
 #[repr(C, align(64))]
 pub struct Network {
-    pub feature_weights: [[[i16; HIDDEN_SIZE]; 768]; INPUT_BUCKETS],
+    pub feature_weights: [[[i8; HIDDEN_SIZE]; 768]; INPUT_BUCKETS],
     pub feature_biases: [i16; HIDDEN_SIZE],
     pub output_weights: [[[i16; HIDDEN_SIZE]; 2]; OUTPUT_BUCKETS],
     pub output_bias: [i16; OUTPUT_BUCKETS],
@@ -48,7 +48,7 @@ impl Network {
     }
 
     #[inline(always)]
-    pub fn feature_weights(&self, piece_idx: usize, bucket: usize) -> &[i16; HIDDEN_SIZE] {
+    pub fn feature_weights(&self, piece_idx: usize, bucket: usize) -> &[i8; HIDDEN_SIZE] {
         debug_assert!(piece_idx < 768);
         debug_assert!(bucket < INPUT_BUCKETS);
         unsafe {

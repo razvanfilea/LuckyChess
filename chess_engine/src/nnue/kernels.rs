@@ -7,7 +7,7 @@ use super::{
     constants::*,
     network::{NNUE, SideAccumulator},
 };
-use fearless_simd::{Simd, i16x32, i32x16, prelude::*};
+use fearless_simd::{Simd, i8x64, i16x32, i32x16, prelude::*};
 
 #[cfg(target_feature = "avx512bw")]
 const PARALLEL_SUMS: usize = 4;
@@ -133,18 +133,23 @@ fn apply_delta<S: Simd, const N: usize>(
     bucket: usize,
     b: usize,
 ) {
+    // One i8x64 load covers two accumulator registers
+    let widen = |index: usize, k: usize| {
+        let row = &NNUE.feature_weights(index, bucket)[b + k * 32..b + (k + 2) * 32];
+        simd.widen_i8x64(i8x64::from_slice(simd, row))
+    };
     for &add in delta.adds() {
-        let row = NNUE.feature_weights(add, bucket);
-        let a = load(simd, row, b);
-        for k in 0..PARALLEL_SUMS {
-            acc[k] += a[k];
+        for k in (0..PARALLEL_SUMS).step_by(2) {
+            let (lo, hi) = widen(add, k);
+            acc[k] += lo;
+            acc[k + 1] += hi;
         }
     }
     for &sub in delta.subs() {
-        let row = NNUE.feature_weights(sub, bucket);
-        let s = load(simd, row, b);
-        for k in 0..PARALLEL_SUMS {
-            acc[k] -= s[k];
+        for k in (0..PARALLEL_SUMS).step_by(2) {
+            let (lo, hi) = widen(sub, k);
+            acc[k] -= lo;
+            acc[k + 1] -= hi;
         }
     }
 }

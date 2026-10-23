@@ -223,7 +223,7 @@ pub const BISHOP_MAGICS: [SMagic; 64] = {bishop_magics:?};
 }
 
 fn generate_nnue_data(out_dir: &str) {
-    let nnue_path = Path::new("src/nnue/lucky-v5.bin");
+    let nnue_path = Path::new("src/nnue/lucky-v6.bin");
     println!("cargo:rerun-if-changed={}", nnue_path.display());
     let bytes = std::fs::read(nnue_path).expect("Failed to read NNUE file");
 

@@ -23,7 +23,7 @@ const SLICES: [(&str, Entry); 4] = [
 
 macro_rules! network_bytes {
     () => {
-        include_bytes!("../../chess_engine/src/nnue/lucky-v5.bin")
+        include_bytes!("../../chess_engine/src/nnue/lucky-v6.bin")
     };
 }
 
