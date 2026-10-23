@@ -31,5 +31,10 @@ codegen-units = 1
 lto = "fat"
 debug = true
 
+[profile.dist]
+inherits = "release"
+debug = false
+strip = true
+
 [profile.dev]
 opt-level = 1

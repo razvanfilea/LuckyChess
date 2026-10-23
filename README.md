@@ -8,10 +8,12 @@ A UCI chess engine written in Rust with an embedded NNUE network. Runs natively,
 
 ## Downloads
 
-Prebuilt binaries are on the [releases page](https://github.com/razvanfilea/LuckyChess/releases):
+Prebuilt binaries are on the [releases page](https://github.com/razvanfilea/LuckyChess/releases).
+The Linux x86-64 binary picks the fastest build for the CPU at startup (`LUCKY_CHESS_ARCH` forces one).
+On Windows, pick one:
 
-- `avx512` / `avx2` — fastest on modern CPUs
-- `sse42` — older CPUs, and AMD Zen 1/2 (the AVX2 builds use PEXT, which is slow on those)
+- `v4` / `v3` — fastest on modern CPUs (`v4` needs AVX-512, `v3` needs AVX2)
+- `v2` — older CPUs, and AMD Zen 1/2 (the `v3` and `v4` builds use PEXT, which is slow on those)
 
 ## Building
 

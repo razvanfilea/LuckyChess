@@ -9,3 +9,6 @@ path = "src/main.rs"
 
 [dependencies]
 chess_engine.workspace = true
+
+[lints.rust]
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(lucky_external_network)", "cfg(lucky_universal)"] }

@@ -227,10 +227,30 @@ fn generate_nnue_data(out_dir: &str) {
     println!("cargo:rerun-if-changed={}", nnue_path.display());
     let bytes = std::fs::read(nnue_path).expect("Failed to read NNUE file");
 
+    let rs_path = Path::new(out_dir).join("nnue_data.rs");
+
+    // Universal builds link several copies of the engine into one executable,
+    // so the launcher embeds the network once and every copy refers to it
+    if env::var_os("CARGO_CFG_LUCKY_EXTERNAL_NETWORK").is_some() {
+        let code = format!(
+            r#"unsafe extern "C" {{
+    #[link_name = "lucky_nnue_network"]
+    static EXTERNAL_NETWORK: Network;
+}}
+
+const _: () = assert!({len} == core::mem::size_of::<Network>());
+
+pub static NNUE: &Network = unsafe {{ &EXTERNAL_NETWORK }};
+"#,
+            len = bytes.len()
+        );
+        std::fs::write(&rs_path, code).expect("Failed to write nnue_data.rs");
+        return;
+    }
+
     let bin_path = Path::new(out_dir).join("network.bin");
     std::fs::write(&bin_path, &bytes).expect("Failed to write network.bin");
 
-    let rs_path = Path::new(out_dir).join("nnue_data.rs");
     let code = format!(
         r#"#[repr(C, align(64))]
 struct AlignedData([u8; {len}]);

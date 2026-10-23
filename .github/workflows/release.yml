@@ -11,12 +11,26 @@ on:
         required: false
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
-  build-windows:
-    name: Build Windows x86-64
-    runs-on: windows-latest
+  build:
+    name: Build ${{ matrix.name }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { name: windows-x86_64-v2,     os: windows-latest,   target: x86_64-pc-windows-msvc,     cpu: x86-64-v2, ext: .exe, flags: "-C target-feature=+crt-static" }
+          - { name: windows-x86_64-v3,     os: windows-latest,   target: x86_64-pc-windows-msvc,     cpu: x86-64-v3, ext: .exe, flags: "-C target-feature=+crt-static" }
+          - { name: windows-x86_64-v4,     os: windows-latest,   target: x86_64-pc-windows-msvc,     cpu: x86-64-v4, ext: .exe, flags: "-C target-feature=+crt-static", no-smoke: true }
+          - { name: linux-x86_64,          os: ubuntu-latest,    target: x86_64-unknown-linux-musl,  universal: true }
+          - { name: linux-aarch64,         os: ubuntu-24.04-arm, target: aarch64-unknown-linux-musl, cpu: generic }
+          - { name: macos-aarch64,         os: macos-latest,     target: aarch64-apple-darwin,       cpu: apple-m1 }
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -25,136 +39,60 @@ jobs:
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
 
-      - name: Compile Windows Binaries (SSE4.2, AVX2, AVX-512)
+      - name: Install musl tools
+        if: contains(matrix.target, 'musl')
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Compile
+        if: ${{ !matrix.universal }}
         shell: bash
-        run: |
-          mkdir -p dist
-
-          RUSTFLAGS="-C target-cpu=x86-64-v2 -C target-feature=+crt-static" cargo build --release --bin lucky_chess
-          cp target/release/lucky_chess.exe dist/lucky-chess-windows-x86_64-sse42.exe
-
-          RUSTFLAGS="-C target-cpu=x86-64-v3 -C target-feature=+crt-static" cargo build --release --bin lucky_chess
-          cp target/release/lucky_chess.exe dist/lucky-chess-windows-x86_64-avx2.exe
-
-          RUSTFLAGS="-C target-cpu=x86-64-v4 -C target-feature=+crt-static" cargo build --release --bin lucky_chess
-          cp target/release/lucky_chess.exe dist/lucky-chess-windows-x86_64-avx512.exe
-
-          cd dist
-          7z a ../lucky-chess-windows-x86_64.zip *.exe ../LICENSE.txt
-
-      - name: Upload Windows Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: windows-binaries
-          path: |
-            dist/*.exe
-            lucky-chess-windows-x86_64.zip
-
-  build-linux-x86:
-    name: Build Linux x86-64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - name: Install Rust toolchain & musl tools
-        run: |
-          sudo apt-get update && sudo apt-get install -y musl-tools
-          rustup target add x86_64-unknown-linux-musl
-
-      - name: Compile Linux musl Binaries
-        run: |
-          mkdir -p dist
-
-          RUSTFLAGS="-C target-cpu=x86-64-v2" cargo build --release --target x86_64-unknown-linux-musl --bin lucky_chess
-          strip target/x86_64-unknown-linux-musl/release/lucky_chess
-          cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-sse42
-
-          RUSTFLAGS="-C target-cpu=x86-64-v3" cargo build --release --target x86_64-unknown-linux-musl --bin lucky_chess
-          strip target/x86_64-unknown-linux-musl/release/lucky_chess
-          cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-avx2
-
-          RUSTFLAGS="-C target-cpu=x86-64-v4" cargo build --release --target x86_64-unknown-linux-musl --bin lucky_chess
-          strip target/x86_64-unknown-linux-musl/release/lucky_chess
-          cp target/x86_64-unknown-linux-musl/release/lucky_chess dist/lucky-chess-linux-x86_64-avx512
-
-          tar -czf lucky-chess-linux-x86_64-musl.tar.gz -C dist . -C .. LICENSE.txt
-
-      - name: Upload Linux x86 Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: linux-x86-binaries
-          path: |
-            dist/*
-            lucky-chess-linux-x86_64-musl.tar.gz
-
-  build-linux-arm64:
-    name: Build Linux ARM64
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - name: Install Rust toolchain & aarch64 cross-linker
-        run: |
-          sudo apt-get update && sudo apt-get install -y gcc-aarch64-linux-gnu
-          rustup target add aarch64-unknown-linux-gnu
-
-      - name: Compile Linux ARM64
         env:
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: aarch64-linux-gnu-gcc
+          RUSTFLAGS: -C target-cpu=${{ matrix.cpu }} ${{ matrix.flags }}
+        run: |
+          cargo build --locked --profile dist --target ${{ matrix.target }} --bin lucky_chess
+          mkdir -p dist
+          cp target/${{ matrix.target }}/dist/lucky_chess${{ matrix.ext }} dist/lucky-chess-${{ matrix.name }}${{ matrix.ext }}
+
+      - name: Compile universal binary
+        if: ${{ matrix.universal }}
         run: |
           mkdir -p dist
-          cargo build --release --target aarch64-unknown-linux-gnu --bin lucky_chess
-          aarch64-linux-gnu-strip target/aarch64-unknown-linux-gnu/release/lucky_chess
-          cp target/aarch64-unknown-linux-gnu/release/lucky_chess dist/lucky-chess-linux-aarch64
-          tar -czf lucky-chess-linux-aarch64.tar.gz -C dist . -C .. LICENSE.txt
+          scripts/build_universal.sh dist/lucky-chess-${{ matrix.name }}
 
-      - name: Upload Linux ARM64 Artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: linux-arm64-binaries
-          path: |
-            dist/*
-            lucky-chess-linux-aarch64.tar.gz
+      # GitHub runners don't reliably support AVX-512, so those builds are only compiled
+      - name: Smoke test
+        if: ${{ !matrix.no-smoke && !matrix.universal }}
+        shell: bash
+        run: ./dist/lucky-chess-${{ matrix.name }}${{ matrix.ext }} bench
 
-  build-macos:
-    name: Build macOS Apple Silicon
-    runs-on: macos-latest
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v7
-        with:
-          lfs: true
-
-      - name: Install Rust toolchain
-        uses: dtolnay/rust-toolchain@stable
-
-      - name: Compile macOS ARM64 Binary
+      - name: Smoke test universal binary
+        if: ${{ matrix.universal }}
         run: |
-          mkdir -p dist
-          cargo build --release --bin lucky_chess
-          strip target/release/lucky_chess
-          cp target/release/lucky_chess dist/lucky-chess-macos-aarch64
-          tar -czf lucky-chess-macos-aarch64.tar.gz -C dist . -C .. LICENSE.txt
+          bin=./dist/lucky-chess-${{ matrix.name }}
+          expected=$("$bin" bench | awk '/Nodes searched/{print $4}')
+          echo "auto: $expected nodes"
+          for arch in x86_64_v2 x86_64_v3_nopext x86_64_v3; do
+            nodes=$(LUCKY_CHESS_ARCH=$arch "$bin" bench | awk '/Nodes searched/{print $4}')
+            echo "$arch: $nodes nodes"
+            [ -n "$nodes" ] && [ "$nodes" = "$expected" ]
+          done
 
-      - name: Upload macOS Artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: macos-binaries
-          path: |
-            dist/*
-            lucky-chess-macos-aarch64.tar.gz
+          name: ${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
 
   release:
     name: Publish Release Assets
-    needs: [build-windows, build-linux-x86, build-linux-arm64, build-macos]
+    needs: build
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v8
@@ -164,8 +102,7 @@ jobs:
 
       - name: Generate Checksums
         working-directory: release-assets
-        run: |
-          sha256sum * > SHA256SUMS.txt || true
+        run: sha256sum lucky-chess-* > SHA256SUMS.txt
 
       - name: Resolve Release Tag
         id: tag
@@ -192,5 +129,7 @@ jobs:
           draft: false
           prerelease: ${{ steps.tag.outputs.prerelease }}
           generate_release_notes: true
+          fail_on_unmatched_files: true
           files: |
-            release-assets/*
+            release-assets/lucky-chess-*
+            release-assets/SHA256SUMS.txt
