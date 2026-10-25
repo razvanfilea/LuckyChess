@@ -252,7 +252,7 @@ pub static NNUE: &Network = unsafe {{ &EXTERNAL_NETWORK }};
     std::fs::write(&bin_path, &bytes).expect("Failed to write network.bin");
 
     let code = format!(
-        r#"#[repr(C, align(64))]
+        r#"#[repr(C, align(2097152))]
 struct AlignedData([u8; {len}]);
 
 static RAW_DATA: AlignedData = AlignedData(*include_bytes!("network.bin"));

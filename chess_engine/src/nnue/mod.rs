@@ -5,7 +5,7 @@ use crate::{
 use chess_core::prelude::*;
 use constants::*;
 use fearless_simd::{Level, Simd, dispatch, i32x16, prelude::*};
-use kernels::{Delta, apply_delta_screlu_dot, screlu_dot};
+use kernels::{Delta, apply_delta_copy, apply_delta_screlu_dot, screlu_dot};
 use network::{NNUE, Network, SideAccumulator};
 
 mod constants;
@@ -14,6 +14,7 @@ mod kernels;
 mod network;
 
 pub use finny::FinnyTable;
+pub use network::advise_huge_pages;
 
 pub fn evaluate(board: &Board) -> i16 {
     FinnyTable::default().eval(board)
@@ -94,7 +95,9 @@ impl AccumulatorStack {
             if changes_king_bucket(stack[base].stack_move, perspective) {
                 stack[ply].acc_computed[pi] = true;
                 let dst = self.accs[ply as usize].side_mut(perspective);
-                return self.finny.refresh(simd, board, perspective, dst, out_w);
+                let sum = self.finny.refresh(simd, board, perspective, dst, out_w);
+                self.backward_fill(simd, stack, base, ply, perspective, bucket, flip);
+                return sum;
             }
             base -= 1;
         }
@@ -123,6 +126,34 @@ impl AccumulatorStack {
         }
 
         screlu_dot(simd, self.accs[src].side(perspective), out_w)
+    }
+
+    #[inline(never)]
+    #[allow(clippy::too_many_arguments)]
+    fn backward_fill<S: Simd>(
+        &mut self,
+        simd: S,
+        stack: &mut SearchStack,
+        king_ply: u16,
+        ply: u16,
+        perspective: Color,
+        bucket: usize,
+        flip: u8,
+    ) {
+        let pi = perspective as usize;
+        let mut src = ply as usize;
+        for i in (king_ply + 1..=ply).rev() {
+            let m = stack[i].stack_move;
+            let Some(piece) = m.moved_piece else {
+                continue; // Same position as the parent: `src` still holds it
+            };
+            let (lo, hi) = self.accs.split_at_mut(src);
+            let delta = move_delta(m, piece, perspective, flip).inverted();
+            let dst = lo[i as usize - 1].side_mut(perspective);
+            apply_delta_copy(simd, hi[0].side(perspective), dst, &delta, bucket);
+            stack[i - 1].acc_computed[pi] = true;
+            src = i as usize - 1;
+        }
     }
 }
 

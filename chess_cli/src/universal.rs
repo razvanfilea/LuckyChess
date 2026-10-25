@@ -27,7 +27,8 @@ macro_rules! network_bytes {
     };
 }
 
-#[repr(C, align(64))]
+/// 2 MB, for huge pages
+#[repr(C, align(2097152))]
 struct Aligned<T>(T);
 
 /// Embedded once and shared by every engine copy, see `generate_nnue_data` in chess_engine/build.rs

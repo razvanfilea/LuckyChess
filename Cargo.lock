@@ -132,6 +132,7 @@ version = "2.0.0"
 dependencies = [
  "chess_core",
  "fearless_simd",
+ "libc",
 ]
 
 [[package]]

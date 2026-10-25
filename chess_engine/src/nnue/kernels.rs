@@ -54,6 +54,16 @@ impl<const N: usize> Delta<N> {
     }
 
     #[inline(always)]
+    pub(super) fn inverted(self) -> Self {
+        Self {
+            adds: self.subs,
+            subs: self.adds,
+            n_adds: self.n_subs,
+            n_subs: self.n_adds,
+        }
+    }
+
+    #[inline(always)]
     fn adds(&self) -> &[usize] {
         // SAFETY: n_adds <= N (see `add`), and entries 0..n_adds were written by `add`.
         unsafe { self.adds.get_unchecked(..self.n_adds).assume_init_ref() }
@@ -168,6 +178,24 @@ pub(super) fn screlu_dot<S: Simd>(
         }
     }
     sums[1..].iter().fold(sums[0], |a, &b| a + b)
+}
+
+/// `dst = src + delta`
+#[inline(always)]
+pub(super) fn apply_delta_copy<S: Simd, const N: usize>(
+    simd: S,
+    src: &SideAccumulator,
+    dst: &mut SideAccumulator,
+    delta: &Delta<N>,
+    bucket: usize,
+) {
+    for b in blocks::<S>() {
+        let mut acc = load(simd, src, b);
+        apply_delta(simd, &mut acc, delta, bucket, b);
+        for k in 0..PARALLEL_SUMS {
+            acc[k].store_slice(&mut dst[lanes::<S>(b, k)]);
+        }
+    }
 }
 
 /// `dst = src + delta`, fused with the SCReLU dot of `dst`
