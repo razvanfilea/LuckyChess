@@ -223,7 +223,7 @@ pub const BISHOP_MAGICS: [SMagic; 64] = {bishop_magics:?};
 }
 
 fn generate_nnue_data(out_dir: &str) {
-    let nnue_path = Path::new("src/nnue/lucky-v6.bin");
+    let nnue_path = Path::new("src/nnue/lucky-v7.bin");
     println!("cargo:rerun-if-changed={}", nnue_path.display());
     let bytes = std::fs::read(nnue_path).expect("Failed to read NNUE file");
 
@@ -251,8 +251,13 @@ pub static NNUE: &Network = unsafe {{ &EXTERNAL_NETWORK }};
     let bin_path = Path::new(out_dir).join("network.bin");
     std::fs::write(&bin_path, &bytes).expect("Failed to write network.bin");
 
+    let align = match env::var("CARGO_CFG_TARGET_OS").as_deref() {
+        Ok("linux") => 2 * 1024 * 1024,
+        _ => 64,
+    };
+
     let code = format!(
-        r#"#[repr(C, align(2097152))]
+        r#"#[repr(C, align({align}))]
 struct AlignedData([u8; {len}]);
 
 static RAW_DATA: AlignedData = AlignedData(*include_bytes!("network.bin"));

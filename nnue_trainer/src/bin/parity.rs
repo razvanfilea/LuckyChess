@@ -1,7 +1,7 @@
 use chess_engine::{board::Board, nnue::evaluate};
 use nnue_trainer::{SCALE, build_trainer};
 
-const CHECKPOINT: &str = "checkpoints/lucky-v6-220";
+const CHECKPOINT: &str = "checkpoints/lucky-v7-260";
 const TOLERANCE: f32 = 40.0;
 
 const FENS: &[&str] = &[

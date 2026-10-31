@@ -47,10 +47,15 @@ e.g. `lucky_chess bench 12`).
   quiescence search
 - **Pruning & reductions:** LMR, LMP, NMP, RFP, futility, SEE and history pruning, delta pruning in qsearch
 - **Move ordering:** MVV-LVA + SEE, killers, history and 1/2-ply continuation history
-- **Evaluation:** NNUE `(768×8 → 1536)x2 → 1×8`, SCReLU, 8 mirrored king buckets, 8 output buckets,
-  incremental accumulators with Finny tables, SIMD via `fearless_simd`. Trained with
-  [`bullet`](https://github.com/jw1912/bullet) on 20B positions of
-  [Leela-derived data](https://huggingface.co/datasets/linrock/bullet-training-data)
+- **Evaluation:** NNUE `(768×16 → 1536)x2 → 1×8`, SCReLU, 16 mirrored king buckets, 8 output buckets,
+  i8 feature weights, incremental accumulators with Finny tables, SIMD via `fearless_simd`. Trained with
+  [`bullet`](https://github.com/jw1912/bullet) for 26B positions (~2 passes) over 12.46B positions of
+  Leela-derived data, shuffled into one file:
+  - 6.57B from [linrock/bullet-training-data](https://huggingface.co/datasets/linrock/bullet-training-data)
+    S2 (`test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist`)
+  - 5.89B from [vondele/linrock_relabel_2](https://huggingface.co/datasets/vondele/linrock_relabel_2)
+    (`test80-2023-{10-oct,11-nov,12-dec}-2tb7p.min-v2.v6.relabel-BT4-tf13tune`), with positions in check,
+    capture/promotion moves and unscored positions dropped
 
 ## Testing
 
@@ -87,7 +92,8 @@ benchmarks/      SPRT and gauntlet scripts, opening books
 
 The code is original. It draws on ideas from [Stockfish](https://github.com/official-stockfish/Stockfish),
 [Alexandria](https://github.com/PGG106/Alexandria) and the [Chess Programming Wiki](https://www.chessprogramming.org/).
-Thanks to [jw1912](https://github.com/jw1912) for `bullet` and [linrock](https://huggingface.co/linrock) for the training data.
+Thanks to [jw1912](https://github.com/jw1912) for `bullet`, and to [linrock](https://huggingface.co/linrock) and
+[vondele](https://huggingface.co/vondele) for the training data.
 
 **AI usage:** LLMs were used for tests and fixtures, profiling and benchmark analysis, and code review. The architecture,
 design decisions and training runs are the author's.

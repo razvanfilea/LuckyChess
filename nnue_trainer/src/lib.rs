@@ -49,7 +49,8 @@ pub fn build_trainer()
 
             let mut l0 = builder.new_affine("l0", 768 * INPUT_BUCKETS, HIDDEN_SIZE);
             // Clip the merged weights so the forward pass sees what the i8 export stores
-            l0.weights = (l0.weights + expanded_factorizer).clip_pass_through_grad(-L0_CLIP, L0_CLIP);
+            l0.weights =
+                (l0.weights + expanded_factorizer).clip_pass_through_grad(-L0_CLIP, L0_CLIP);
 
             let l1 = builder.new_affine("l1", 2 * HIDDEN_SIZE, OUTPUT_BUCKETS);
 

@@ -53,25 +53,27 @@ PGN_OUT="${PGN_DIR}/ccrl_blitz_${TIMESTAMP}.pgn"
 echo "=========================================================="
 echo " CCRL Blitz Benchmark Tournament"
 echo " Time Control : ${TC}"
-echo " Tournament   : Gauntlet (${ROUNDS} rounds x 4 opponents x 2 games, paired openings)"
+echo " Tournament   : Gauntlet (${ROUNDS} rounds x 5 opponents x 2 games, paired openings)"
 echo " Concurrency  : ${CORES} concurrent games"
 echo " Opening Book : $(basename "${BOOK_PATH}") (plies=24 / 12 moves max)"
 echo " Engines      :"
 echo "   - lucky_dev"
-echo "   - Pawn_3557"
-echo "   - Prune_3645"
 echo "   - Akimbo_3614"
-echo "   - Oxide_3530"
+echo "   - Prune_3645"
+echo "   - Booot_3652"
+echo "   - Gaia_3661"
+echo "   - Icarus_3672"
 echo "=========================================================="
 
 fastchess \
   -tournament gauntlet \
   -seeds 1 \
   -engine cmd="${BIN_DIR}/lucky_dev" name=lucky_dev \
-  -engine cmd="${BIN_DIR}/pawn-v4.0-3557" name=Pawn_3557 \
   -engine cmd="${BIN_DIR}/akimbo-1.0.0-avx2_3614" name=Akimbo_3614 \
-  -engine cmd="${BIN_DIR}/OxideV3.0.0_ELO_3530" name=Oxide_3530 \
   -engine cmd="${BIN_DIR}/prune-v4.0.1_3645" name=Prune_3645 \
+  -engine cmd="${BIN_DIR}/booot7_3652" name=Booot_3652 \
+  -engine cmd="${BIN_DIR}/gaiachess_3661" name=Gaia_3661 \
+  -engine cmd="${BIN_DIR}/icarus_3672" name=Icarus_3672 \
   -each tc="${TC}" option.Hash=128 option.Threads=1 option.Ponder=false ${EGTB_OPT} \
   -rounds "${ROUNDS}" \
   -repeat \

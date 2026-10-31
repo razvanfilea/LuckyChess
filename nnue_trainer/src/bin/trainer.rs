@@ -7,22 +7,11 @@ use bullet_lib::{
 };
 use nnue_trainer::{SCALE, build_trainer};
 
-const DATA_PATHS: &[&str] = &[
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-1.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-2.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-3.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-4.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-5.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-6.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-7.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-8.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-9.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-10.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-11.bullet.bin",
-    "data/S2/test77nov-unfilt-test79-maraprmay-v6-dd.skip-see-ge0.wdl-pdist.iter-12.bullet.bin",
-];
+/// S2 (6.57B) + linrock_relabel_2 Oct–Dec 2023 (5.89B, no positions in check, captures, promotions or
+/// unscored), shuffled together with `bullet-utils interleave`
+const DATA_PATHS: &[&str] = &["data/mix/s2-relabel2q4.bin"];
 
-const SUPERBATCHES: usize = 220;
+const SUPERBATCHES: usize = 260;
 
 fn main() {
     let mut trainer = build_trainer();
@@ -44,7 +33,7 @@ fn main() {
     };
 
     let schedule = TrainingSchedule {
-        net_id: "lucky-v6".to_string(),
+        net_id: "lucky-v7".to_string(),
         eval_scale: SCALE as f32,
         steps: TrainingSteps {
             batch_size: 16_384,

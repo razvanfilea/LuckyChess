@@ -23,12 +23,12 @@ const SLICES: [(&str, Entry); 4] = [
 
 macro_rules! network_bytes {
     () => {
-        include_bytes!("../../chess_engine/src/nnue/lucky-v6.bin")
+        include_bytes!("../../chess_engine/src/nnue/lucky-v7.bin")
     };
 }
 
-/// 2 MB, for huge pages
-#[repr(C, align(2097152))]
+#[cfg_attr(target_os = "linux", repr(C, align(2097152)))]
+#[cfg_attr(not(target_os = "linux"), repr(C, align(64)))]
 struct Aligned<T>(T);
 
 /// Embedded once and shared by every engine copy, see `generate_nnue_data` in chess_engine/build.rs

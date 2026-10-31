@@ -11,7 +11,7 @@ DEV_BIN="${BIN_DIR}/lucky_dev"
 ELO0="${1:-0.0}"
 ELO1="${2:-5.0}"
 TC="${3:-8+0.08}"
-CORES=12
+CORES="${CORES:-12}"
 
 if [ ! -f "${BASE_BIN}" ]; then
     echo "Error: Baseline engine not found at ${BASE_BIN}"
