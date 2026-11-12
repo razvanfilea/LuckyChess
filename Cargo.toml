@@ -24,7 +24,7 @@ license = "GPL-3.0-only"
 chess_core = { path = "chess_core" }
 chess_engine = { path = "chess_engine" }
 bitflags = "2.13"
-fearless_simd = "1.0.0"
+fearless_simd = "1.2.0"
 
 [profile.release]
 codegen-units = 1

@@ -78,44 +78,9 @@ impl<const N: usize> Delta<N> {
 
 #[inline(always)]
 fn screlu_accumulate<S: Simd>(simd: S, v: i16x32<S>, out_w: &[i16], sum: &mut i32x16<S>) {
-    let clamped = v
-        .max(i16x32::splat(simd, 0))
-        .min(i16x32::splat(simd, QA as i16));
-
-    cfg_select! {
-        all(target_arch = "x86_64", target_feature = "avx512bw") => {
-            unsafe {
-                use std::arch::x86_64::*;
-                let c: __m512i = clamped.into();
-                let w = _mm512_load_si512(out_w.as_ptr() as *const __m512i);
-                let dot = _mm512_madd_epi16(c, _mm512_mullo_epi16(c, w));
-                let s: __m512i = (*sum).into();
-                *sum = SimdFrom::simd_from(simd, _mm512_add_epi32(s, dot));
-            }
-        }
-        all(target_arch = "x86_64", target_feature = "avx2") => {
-            unsafe {
-                use std::arch::x86_64::*;
-                let (c0, c1) = clamped.split();
-                let (c0, c1): (__m256i, __m256i) = (c0.into(), c1.into());
-                let out_w_ptr = out_w.as_ptr() as *const __m256i;
-                let (w0, w1) = (_mm256_load_si256(out_w_ptr), _mm256_load_si256(out_w_ptr.offset(1)));
-                let (p0, p1) = (_mm256_mullo_epi16(c0, w0), _mm256_mullo_epi16(c1, w1));
-                let (dot0, dot1) = (_mm256_madd_epi16(c0, p0), _mm256_madd_epi16(c1, p1));
-                let (s0, s1) = (*sum).split();
-                let (s0, s1): (__m256i, __m256i) = (s0.into(), s1.into());
-                let lo: fearless_simd::i32x8<S> = SimdFrom::simd_from(simd, _mm256_add_epi32(s0, dot0));
-                let hi: fearless_simd::i32x8<S> = SimdFrom::simd_from(simd, _mm256_add_epi32(s1, dot1));
-                *sum = lo.combine(hi);
-            }
-        }
-        _ => {
-            let (lower_val, upper_val) = clamped.widen();
-            let (lower_weight, upper_weight) = i16x32::from_slice(simd, out_w).widen();
-            *sum += lower_val * lower_val * lower_weight;
-            *sum += upper_val * upper_val * upper_weight;
-        }
-    }
+    let clamped = v.clamp(i16x32::splat(simd, 0), i16x32::splat(simd, QA as i16));
+    let w = i16x32::from_slice(simd, out_w);
+    *sum += clamped.pairwise_dot_product(clamped * w);
 }
 
 #[inline(always)]
