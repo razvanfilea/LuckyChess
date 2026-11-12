@@ -2,6 +2,3 @@
 name = "chess_core"
 version.workspace = true
 edition.workspace = true
-
-[dependencies]
-bitflags.workspace = true
