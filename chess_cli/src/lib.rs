@@ -44,7 +44,7 @@ fn handle_cli_command(cmd: &str) -> bool {
 }
 
 pub fn run(args: Vec<String>) {
-    chess_engine::nnue::advise_huge_pages();
+    chess_engine::nnue_advise_huge_pages();
     let mut uci = UciState::new(|line| println!("{line}"));
 
     if args.len() > 1 {

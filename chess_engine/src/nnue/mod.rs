@@ -6,7 +6,8 @@ use chess_core::prelude::*;
 use constants::*;
 use fearless_simd::{Level, Simd, dispatch, i32x16, prelude::*};
 use kernels::{Delta, apply_delta_copy, apply_delta_screlu_dot, screlu_dot};
-use network::{NNUE, Network, SideAccumulator};
+use network::SideAccumulator;
+pub(crate) use network::{NNUE, Network};
 
 mod constants;
 mod finny;
@@ -14,7 +15,6 @@ mod kernels;
 mod network;
 
 pub use finny::FinnyTable;
-pub use network::advise_huge_pages;
 
 pub fn evaluate(board: &Board) -> i16 {
     FinnyTable::default().eval(board)

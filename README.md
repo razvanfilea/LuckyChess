@@ -17,7 +17,7 @@ On Windows, pick one:
 
 ## Building
 
-Requires Rust 1.98+ and [Git LFS](https://git-lfs.com/) for the network weights (`git lfs pull` after cloning).
+Requires Rust 1.100+ and [Git LFS](https://git-lfs.com/) for the network weights (`git lfs pull` after cloning).
 
 ```bash
 RUSTFLAGS="-C target-cpu=native" cargo build --release --bin lucky_chess

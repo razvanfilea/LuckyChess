@@ -88,14 +88,5 @@ impl Network {
     }
 }
 
-pub fn advise_huge_pages() {
-    #[cfg(target_os = "linux")]
-    unsafe {
-        const HUGE_PAGE: usize = 2 * 1024 * 1024;
-        let len = size_of::<Network>().next_multiple_of(HUGE_PAGE);
-        libc::madvise(&raw const *NNUE as *mut libc::c_void, len, libc::MADV_HUGEPAGE);
-    }
-}
-
 pub type SideAccumulator = [i16; HIDDEN_SIZE];
 pub type OutputWeights = &'static [i16; HIDDEN_SIZE];

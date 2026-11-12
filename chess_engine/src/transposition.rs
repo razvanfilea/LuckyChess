@@ -2,6 +2,7 @@ use std::sync::atomic::{AtomicU8, AtomicU64, Ordering::Relaxed};
 
 use chess_core::Move;
 
+use crate::large_pages::LargePages;
 use crate::search::{EVAL_NONE, MATE_THRESHOLD};
 
 #[repr(u8)]
@@ -197,7 +198,7 @@ const BUCKET_SIZE: usize = 4;
 struct TTBucket([AtomicTTEntry; BUCKET_SIZE]);
 
 pub struct TranspositionTable {
-    buckets: Box<[TTBucket]>,
+    buckets: Box<[TTBucket], LargePages>,
     /// Current search generation (0..=31, matching `TTEntry::age`).
     age: AtomicU8,
 }
@@ -210,9 +211,10 @@ impl TranspositionTable {
 
     pub fn with_buckets(bucket_count: usize) -> Self {
         let bucket_count = bucket_count.max(1);
-        let buckets = (0..bucket_count).map(|_| TTBucket::default()).collect();
+        let mut buckets = Vec::with_capacity_in(bucket_count, LargePages);
+        buckets.resize_with(bucket_count, TTBucket::default);
         Self {
-            buckets,
+            buckets: buckets.into_boxed_slice(),
             age: AtomicU8::default(),
         }
     }

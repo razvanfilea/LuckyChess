@@ -7,7 +7,7 @@ edition.workspace = true
 chess_core.workspace = true
 fearless_simd.workspace = true
 
-[target.'cfg(target_os = "linux")'.dependencies]
+[target.'cfg(any(target_os = "linux", target_os = "android"))'.dependencies]
 libc = "0.2"
 
 [build-dependencies]
